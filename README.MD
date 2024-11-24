@@ -19,6 +19,6 @@
 
 # LICENSE
 
-MIT
+[MIT](./LICENSE-MIT)
 
 
