@@ -118,6 +118,7 @@ func (r *WebSocketUnit) HandleWebSocket(ResponseWriter http.ResponseWriter, Requ
 			// 连接关闭时从连接池中移除
 			pool.Lock.Lock()
 			delete(pool.Connections, wsConn)
+			r.RemoveChatSlot(wsConn.UserName)
 			pool.Lock.Unlock()
 			conn.Close()
 		}()
@@ -150,8 +151,11 @@ func (r *WebSocketUnit) HandleWebSocketMessage(conn *websocket.Conn, msg []byte)
 		}
 	} else if data.Type == consts.CreateChannel { // 是否是建立连接
 		if res != nil {
-			// tw.Tw(context.Background(), "接收消息通道：%s", data.Data.(g.Map)["target"])
-			res.Target = data.Data.(g.Map)["target"].(string)
+			tw.Tw(context.Background(), "消息通道创建：%s", data.Data.(g.Map)["target"])
+			targetName := data.Data.(g.Map)["target"].(string)
+			res.Target = targetName
+			// 同步历史消息（如果有的话）
+			r.SyncChat(res.UserName)
 		}
 	} else if data.Type == consts.Send { // 是否是发送聊天消息
 		if res != nil && res.Target != "" {
@@ -212,9 +216,19 @@ func (r *WebSocketUnit) sendHeartbeat() {
 // 聊天消息处理
 
 // 获取消息索引
-func (r *WebSocketUnit) getList(username string) int {
+func (r *WebSocketUnit) getList(names ...string) int {
+	userName := names[0]
+	if len(names) == 1 {
+		for i, it := range r.ChatListData {
+			if it.Users[0] == userName || it.Users[1] == userName {
+				return i
+			}
+		}
+		return -1
+	}
+	targetName := names[1]
 	for i, it := range r.ChatListData {
-		if it.Users[0] == username || it.Users[1] == username {
+		if it.Users[0] == userName || it.Users[1] == targetName {
 			return i
 		}
 	}
@@ -278,4 +292,21 @@ func (r *WebSocketUnit) SyncChat(un string) {
 		return
 	}
 	wsRes.Conn.WriteMessage(websocket.TextMessage, NewDataBytes)
+}
+
+// 移除聊天消息列表
+func (r *WebSocketUnit) RemoveChatSlot(un string) {
+	index := r.getList(un)
+	if index == -1 {
+		return
+	}
+	ListToken := r.ChatListData[index]
+	UserName := ListToken.Users[0]
+	TargetName := ListToken.Users[1]
+	link1 := r.GetWsForUsername(UserName)
+	link2 := r.GetWsForUsername(TargetName)
+	if link1 == nil && link2 == nil {
+		// 双方都断开连接，保存记录到数据库，并删除内存聊天数据
+		r.ChatListData = append(r.ChatListData[:index-1], r.ChatListData[index:]...)
+	}
 }
