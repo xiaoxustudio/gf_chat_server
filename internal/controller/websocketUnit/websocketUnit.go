@@ -165,6 +165,7 @@ func (r *WebSocketUnit) HandleWebSocketMessage(conn *websocket.Conn, msg []byte)
 	} else if data.Type == consts.WithDraw { // 是否是撤回聊天消息
 		if res.Target != "" && res.UserName != "" {
 			index := data.Data.(g.Map)["index"].(float64)
+			tw.Tw(context.Background(), "撤回数据：%s %s ", res.UserName, res.Target)
 			r.RemoveChat(res.UserName, res.Target, int(index))
 		}
 	}
@@ -233,7 +234,9 @@ func (r *WebSocketUnit) getList(names ...string) int {
 	}
 	targetName := names[1]
 	for i, it := range r.ChatListData {
-		if it.Users[0] == userName || it.Users[1] == targetName {
+		if it.Users[0] == userName && it.Users[1] == targetName {
+			return i
+		} else if it.Users[1] == userName && it.Users[0] == targetName {
 			return i
 		}
 	}
