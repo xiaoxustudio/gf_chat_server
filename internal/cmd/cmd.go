@@ -2,24 +2,14 @@ package cmd
 
 import (
 	"context"
-	"gf_server/internal/controller/home"
-	"gf_server/internal/controller/user"
-	websocketunit "gf_server/internal/controller/websocketUnit"
-	"net/http"
+	"gf_chat_server/internal/controller/home"
+	"gf_chat_server/internal/controller/user"
+	websocketunit "gf_chat_server/internal/controller/websocketUnit"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/os/gcmd"
-	"github.com/gorilla/websocket"
 )
-
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
 
 var (
 	Main = gcmd.Command{

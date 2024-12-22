@@ -2,7 +2,7 @@ package imc
 
 import (
 	"context"
-	"gf_server/utility/tw"
+	"gf_chat_server/utility/tw"
 )
 
 type Imc struct{}

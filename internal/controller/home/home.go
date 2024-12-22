@@ -1,9 +1,9 @@
 package home
 
 import (
-	"gf_server/internal/consts"
-	"gf_server/utility/msgtoken"
-	"gf_server/utility/token"
+	"gf_chat_server/internal/consts"
+	"gf_chat_server/utility/msgtoken"
+	"gf_chat_server/utility/token"
 
 	"github.com/gogf/gf/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"

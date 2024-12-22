@@ -5,7 +5,7 @@
 package dao
 
 import (
-	"gf_server/internal/dao/internal"
+	"gf_chat_server/internal/dao/internal"
 )
 
 // internalUserDao is internal type for wrapping internal DAO implements.

@@ -3,10 +3,11 @@ package websocketunit
 import (
 	"context"
 	"encoding/json"
-	"gf_server/internal/consts"
-	scmsg "gf_server/utility/scMsg"
-	"gf_server/utility/token"
-	"gf_server/utility/tw"
+	"gf_chat_server/internal/consts"
+	array "gf_chat_server/utility/array"
+	scmsg "gf_chat_server/utility/scMsg"
+	"gf_chat_server/utility/token"
+	"gf_chat_server/utility/tw"
 	"net/http"
 	"sync"
 	"time"
@@ -142,25 +143,27 @@ func (r *WebSocketUnit) HandleWebSocketMessage(conn *websocket.Conn, msg []byte)
 	var data scmsg.SCMsgO
 	err := json.Unmarshal(msg, &data)
 	res := r.GetWsForConn(conn)
-	if err != nil {
+
+	if err != nil || res == nil {
 		return
 	} else if data.Type == consts.HeartBeat { // 判断是否是心跳
 		// tw.Tw(context.Background(), "接收心跳消息：%s", data.Message)
-		if res != nil {
-			res.HearbeatLastTime = gtime.Now().Unix()
-		}
+		res.HearbeatLastTime = gtime.Now().Unix()
 	} else if data.Type == consts.CreateChannel { // 是否是建立连接
-		if res != nil {
-			tw.Tw(context.Background(), "消息通道创建：%s", data.Data.(g.Map)["target"])
-			targetName := data.Data.(g.Map)["target"].(string)
-			res.Target = targetName
-			// 同步历史消息（如果有的话）
-			r.SyncChat(res.UserName)
-		}
+		tw.Tw(context.Background(), "消息通道创建：%s", data.Data.(g.Map)["target"])
+		targetName := data.Data.(g.Map)["target"].(string)
+		res.Target = targetName
+		// 同步历史消息（如果有的话）
+		r.SyncChat(res.UserName)
 	} else if data.Type == consts.Send { // 是否是发送聊天消息
-		if res != nil && res.Target != "" {
+		if res.Target != "" {
 			// tw.Tw(context.Background(), "接收消息通道：%s", data.Data.(g.Map)["target"])
 			r.OnMessage(res, data)
+		}
+	} else if data.Type == consts.WithDraw { // 是否是撤回聊天消息
+		if res.Target != "" && res.UserName != "" {
+			index := data.Data.(g.Map)["index"].(float64)
+			r.RemoveChat(res.UserName, res.Target, int(index))
 		}
 	}
 }
@@ -294,7 +297,7 @@ func (r *WebSocketUnit) SyncChat(un string) {
 	wsRes.Conn.WriteMessage(websocket.TextMessage, NewDataBytes)
 }
 
-// 移除聊天消息列表
+// 移除指定用户的聊天消息列表
 func (r *WebSocketUnit) RemoveChatSlot(un string) {
 	index := r.getList(un)
 	if index == -1 {
@@ -307,6 +310,25 @@ func (r *WebSocketUnit) RemoveChatSlot(un string) {
 	link2 := r.GetWsForUsername(TargetName)
 	if link1 == nil && link2 == nil {
 		// 双方都断开连接，保存记录到数据库，并删除内存聊天数据
-		r.ChatListData = append(r.ChatListData[:index-1], r.ChatListData[index:]...)
+		// r.ChatListData = append(r.ChatListData[:index-1], r.ChatListData[index:]...)
+	}
+}
+
+// 移除指定用户的指定聊天消息
+func (r *WebSocketUnit) RemoveChat(un string, tg string, chatIndex int) {
+	index := r.getList(un, tg)
+	if index == -1 {
+		return
+	}
+	ListToken := &r.ChatListData[index]
+	list := ListToken.ChatList
+	if chatIndex >= 0 && chatIndex < len(list) {
+		// 移除指定索引的聊天消息
+		ListToken.ChatList = array.RemoveItemFromArray(list, chatIndex)
+		// 同步聊天
+		UserName := ListToken.Users[0]
+		TargetName := ListToken.Users[1]
+		r.SyncChat(UserName)
+		r.SyncChat(TargetName)
 	}
 }

@@ -1,4 +1,4 @@
-module gf_server
+module gf_chat_server
 
 go 1.22
 

@@ -1,7 +1,7 @@
 package scmsg
 
 import (
-	"gf_server/internal/consts"
+	"gf_chat_server/internal/consts"
 
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
