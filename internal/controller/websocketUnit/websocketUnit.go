@@ -33,11 +33,13 @@ type WebSocketPool struct {
 }
 
 type ChatItem struct {
-	NickName  string `json:"nickname"`
-	SendID    string `json:"send_id"`
-	ReceiveID string `json:"receive_id"`
-	Content   string `json:"content"`
-	Time      string `json:"time"`
+	NickName  string              `json:"nickname"`
+	SendID    string              `json:"send_id"`
+	ReceiveID string              `json:"receive_id"`
+	Content   string              `json:"content"`
+	Time      string              `json:"time"`
+	Files     []string            `json:"files"`
+	Type      consts.ChatItemType `json:"type"`
 }
 
 // 聊天单元
@@ -252,6 +254,7 @@ func (r *WebSocketUnit) OnMessage(connect *WebSocketConnection, data scmsg.SCMsg
 	// 将聊天信息存储到自身进程
 	// 聊天记录将在双方的一方断开时自动写入
 	tw.Tw(context.Background(), "接收聊天消息 to %s：%s", connect.Target, data.Message)
+	tw.Tw(context.Background(), "徐然 to %s", data.Data.(g.Map)["files"])
 	// 判断是否有记录
 	index := r.getList(connect.UserName)
 	if index == -1 {
@@ -268,13 +271,26 @@ func (r *WebSocketUnit) OnMessage(connect *WebSocketConnection, data scmsg.SCMsg
 	if err != nil {
 		return
 	}
+
+	// 将传入的[]interface{}转换为p[]string
+	cacheInterface := data.Data.(g.Map)["files"].([]interface{})
+	ImageStrings := make([]string, len(cacheInterface))
+	for i, val := range cacheInterface {
+		if str, ok := val.(string); ok {
+			ImageStrings[i] = str
+		}
+	}
+
 	ListToken := &r.ChatListData[index]
 	ListToken.ChatList = append(ListToken.ChatList, ChatItem{
 		NickName:  res.GMap().Get("nickname").(string),
 		SendID:    connect.UserName,
 		ReceiveID: connect.Target,
 		Content:   data.Message,
-		Time:      gtime.Datetime()})
+		Time:      gtime.Datetime(),
+		Type:      consts.Common,
+		Files:     ImageStrings,
+	})
 	r.SyncChat(connect.UserName)
 	r.SyncChat(connect.Target)
 }

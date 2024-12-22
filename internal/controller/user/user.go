@@ -11,6 +11,8 @@ import (
 	"gf_chat_server/utility/tw"
 	"gf_chat_server/utility/verifiy"
 	"gf_chat_server/utility/xtime"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -242,4 +244,80 @@ func (c *User) SearchUsers(req *ghttp.Request) {
 		}
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "验证失败", nil)))
 	}
+}
+
+func getTemp() string {
+	return "./temp"
+}
+
+// 清空指定的目录
+func clearTempDir(dir string) error {
+	// 使用os.ReadDir读取目录下的所有文件和目录
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+
+	// 遍历文件和目录，并删除它们
+	for _, entry := range entries {
+		path := filepath.Join(dir, entry.Name())
+		err := os.RemoveAll(path)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// 上传图片
+func (c *User) UploadImg(req *ghttp.Request) {
+	files := req.GetUploadFiles("file")
+	if files == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "请选择需要上传的文件", nil)))
+	}
+	maxFiles := 5 // 文件阈值
+	// 检测temp 目录文件数量是否超出，超出则清空
+	TempFiles, err := os.ReadDir(getTemp())
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "上传失败："+err.Error(), nil)))
+		return
+	}
+	// 清空操作
+	if len(TempFiles) > maxFiles {
+		// 清空temp目录
+		err = clearTempDir(getTemp())
+		if err != nil {
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "上传失败："+err.Error(), nil)))
+			return
+		}
+	}
+
+	allowedMimeTypes := map[string]bool{
+		"image/png":  true,
+		"image/jpeg": true,
+		"image/jpg":  true,
+	}
+	maxFileSize := int64(1 * 1024 * 1024) // 1MB文件大小限制
+	// 检查文件类型和大小
+	for _, file := range files {
+		if !allowedMimeTypes[file.Header.Get("Content-Type")] {
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "不支持的文件类型，只允许上传png、jpg、jpeg文件", nil)))
+			return
+		}
+		if file.Size > maxFileSize {
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "文件大小超出限制，最大允许1MB", nil)))
+			return
+		}
+	}
+
+	names, err := files.Save(getTemp())
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "上传失败："+err.Error(), nil)))
+	}
+	cacheFilesStrings := make([]string, len(names)-1)
+	for _, val := range names {
+		cacheFilesStrings = append(cacheFilesStrings, getTemp()+"/"+val)
+	}
+	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(1, "上传成功", cacheFilesStrings)))
 }

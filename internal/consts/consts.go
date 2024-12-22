@@ -1,7 +1,8 @@
 package consts
 
-type ErrorCode int
-type WsCode int
+type ErrorCode int    // 错误码
+type WsCode int       // websocket 码
+type ChatItemType int // 聊天数据类型
 
 const (
 	Status ErrorCode = iota + 1
@@ -32,6 +33,12 @@ const (
 	UpdateMsgList
 )
 
+const (
+	chatType ChatItemType = 800 + iota
+	Common                // 普通消息类型
+	System                // 系统消息类型
+)
+
 func (t ErrorCode) String() string {
 	names := map[ErrorCode]string{
 		TokenExpired: "Expired",
@@ -50,6 +57,13 @@ func (t WsCode) String() string {
 		CreateChannel:     "建立连接",
 		DisConnectChannel: "断开连接",
 		UpdateMsgList:     "更新消息列表",
+	}
+	return names[t]
+}
+func (t ChatItemType) String() string {
+	names := map[ChatItemType]string{
+		Common: "普通消息",
+		System: "系统消息",
 	}
 	return names[t]
 }
