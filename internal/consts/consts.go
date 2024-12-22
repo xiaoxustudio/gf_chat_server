@@ -34,7 +34,7 @@ const (
 )
 
 const (
-	chatType ChatItemType = 800 + iota
+	chatType ChatItemType = 900 + iota
 	Common                // 普通消息类型
 	System                // 系统消息类型
 )
