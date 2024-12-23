@@ -22,4 +22,5 @@ type User struct {
 	LoginTime    *gtime.Time // 用户最后登录时间
 	Token        interface{} // 用户token
 	Group        interface{} // 用户分组ID
+	Avatar       interface{} // 用户头像
 }

@@ -20,4 +20,5 @@ type User struct {
 	LoginTime    *gtime.Time `json:"login_time"    orm:"login_time"    ` // 用户最后登录时间
 	Token        string      `json:"token"         orm:"token"         ` // 用户token
 	Group        int         `json:"group"         orm:"group"         ` // 用户分组ID
+	Avatar       string      `json:"avatar"        orm:"avatar"        ` // 用户头像
 }

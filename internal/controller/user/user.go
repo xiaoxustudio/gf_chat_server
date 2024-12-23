@@ -137,6 +137,7 @@ func (c *User) GetUser(req *ghttp.Request) {
 			"username":      singleData["username"],
 			"phone":         singleData["phone"],
 			"email":         singleData["email"],
+			"avatar":        singleData["avatar"],
 			"register_time": singleData["register_time"],
 			"login_time":    singleData["login_time"],
 			"group":         singleData["group"],
@@ -270,45 +271,34 @@ func clearTempDir(dir string) error {
 	return nil
 }
 
-// 上传图片或头像
+var allowedMimeTypes = map[string]bool{
+	"image/png":  true,
+	"image/jpeg": true,
+	"image/jpg":  true,
+}
+
+// 上传图片或头像（获取图片地址）
 func (c *User) UploadImg(req *ghttp.Request) {
 	files := req.GetUploadFiles("file")
-	typeVal := req.GetFormMap()["type"]
-
-	var targetPath string
-	if typeVal == nil || typeVal != "avatar" {
-		targetPath = getTemp()
-	} else {
-		targetPath = "./resource/avatar"
-	}
+	var targetPath = getTemp()
 	if files == nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "请选择需要上传的文件", nil)))
 	}
-
-	if typeVal != "avatar" {
-		maxFiles := 5 // 文件阈值
-		// 检测目录文件数量是否超出，超出则清空
-		TempFiles, err := os.ReadDir(targetPath)
+	maxFiles := 5 // 文件阈值
+	// 检测目录文件数量是否超出，超出则清空
+	TempFiles, err := os.ReadDir(targetPath)
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "上传失败："+err.Error(), nil)))
+		return
+	}
+	// 清空操作
+	if len(TempFiles) > maxFiles {
+		// 清空temp目录
+		err = clearTempDir(targetPath)
 		if err != nil {
 			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "上传失败："+err.Error(), nil)))
 			return
 		}
-		// 清空操作
-		if len(TempFiles) > maxFiles {
-			// 清空temp目录
-			err = clearTempDir(targetPath)
-			if err != nil {
-				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "上传失败："+err.Error(), nil)))
-				return
-			}
-		}
-
-	}
-
-	allowedMimeTypes := map[string]bool{
-		"image/png":  true,
-		"image/jpeg": true,
-		"image/jpg":  true,
 	}
 	maxFileSize := int64(1 * 1024 * 1024) // 1MB文件大小限制
 	// 检查文件类型和大小
@@ -332,4 +322,38 @@ func (c *User) UploadImg(req *ghttp.Request) {
 		cacheFilesStrings = append(cacheFilesStrings, targetPath+"/"+val)
 	}
 	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(1, "上传成功", cacheFilesStrings)))
+}
+
+// 修改头像
+func (c *User) ChangeAvatar(req *ghttp.Request) {
+	md := g.Model("user")
+	tok := req.Header.Get("Authorization")
+	if len(tok) == 0 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "token校验失败！", nil)))
+	}
+	_, err := token.ValidToken(tok)
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "token校验失败:"+err.Error(), nil)))
+	}
+	files := req.GetUploadFiles("file")
+	if files == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "请选择需要上传的文件", nil)))
+	}
+
+	targetPath := "./resource/avatar"
+	names, err := files.Save(targetPath)
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "上传失败："+err.Error(), nil)))
+	}
+	cacheFilesStrings := make([]string, len(names)-1)
+	for _, val := range names {
+		cacheFilesStrings = append(cacheFilesStrings, targetPath+"/"+val)
+	}
+
+	_, err = md.Where("token", tok).Update(g.Map{"avatar": cacheFilesStrings[0]})
+	if err == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(1, "ok", cacheFilesStrings[0])))
+	} else {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "修改失败！"+err.Error(), nil)))
+	}
 }

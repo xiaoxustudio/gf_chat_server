@@ -30,6 +30,7 @@ type UserColumns struct {
 	LoginTime    string // 用户最后登录时间
 	Token        string // 用户token
 	Group        string // 用户分组ID
+	Avatar       string // 用户头像
 }
 
 // userColumns holds the columns for table user.
@@ -44,6 +45,7 @@ var userColumns = UserColumns{
 	LoginTime:    "login_time",
 	Token:        "token",
 	Group:        "group",
+	Avatar:       "avatar",
 }
 
 // NewUserDao creates and returns a new DAO object for table data access.

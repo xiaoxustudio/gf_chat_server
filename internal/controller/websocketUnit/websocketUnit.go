@@ -34,6 +34,7 @@ type WebSocketPool struct {
 
 type ChatItem struct {
 	NickName  string              `json:"nickname"`
+	Avatar    string              `json:"avatar"`
 	SendID    string              `json:"send_id"`
 	ReceiveID string              `json:"receive_id"`
 	Content   string              `json:"content"`
@@ -44,8 +45,9 @@ type ChatItem struct {
 
 // 聊天单元
 type ChatToken struct {
-	Users    []string
-	ChatList []ChatItem
+	Users        []string
+	UsersAvatars []string
+	ChatList     []ChatItem
 }
 
 var upgrader = websocket.Upgrader{
@@ -257,22 +259,25 @@ func (r *WebSocketUnit) OnMessage(connect *WebSocketConnection, data scmsg.SCMsg
 	// 将聊天信息存储到自身进程
 	// 聊天记录将在双方的一方断开时自动写入
 	tw.Tw(context.Background(), "接收聊天消息 to %s：%s", connect.Target, data.Message)
-	tw.Tw(context.Background(), "徐然 to %s", data.Data.(g.Map)["files"])
+	res, err := g.Model("user").Where("username", connect.UserName).One()
+	if err != nil {
+		return
+	}
+	res1, err := g.Model("user").Where("username", connect.Target).One()
+	if err != nil {
+		return
+	}
 	// 判断是否有记录
 	index := r.getList(connect.UserName)
 	if index == -1 {
-		// 创建新记录
+		// 创建新记录并更新头像
 		var listTk = ChatToken{
-			Users:    []string{connect.UserName, connect.Target},
-			ChatList: []ChatItem{},
+			Users:        []string{connect.UserName, connect.Target},
+			UsersAvatars: []string{res.GMap().Get("avatar").(string), res1.GMap().Get("avatar").(string)},
+			ChatList:     []ChatItem{},
 		}
 		r.ChatListData = append(r.ChatListData, listTk)
 		index = len(r.ChatListData) - 1
-	}
-	md := g.Model("user")
-	res, err := md.Where("username", connect.UserName).One()
-	if err != nil {
-		return
 	}
 
 	// 将传入的[]interface{}转换为p[]string
@@ -286,6 +291,7 @@ func (r *WebSocketUnit) OnMessage(connect *WebSocketConnection, data scmsg.SCMsg
 
 	ListToken := &r.ChatListData[index]
 	ListToken.ChatList = append(ListToken.ChatList, ChatItem{
+		Avatar:    res.GMap().Get("avatar").(string),
 		NickName:  res.GMap().Get("nickname").(string),
 		SendID:    connect.UserName,
 		ReceiveID: connect.Target,

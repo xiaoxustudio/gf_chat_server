@@ -40,6 +40,7 @@ var (
 			})
 			s.SetServerRoot("/resource/public")
 			s.AddStaticPath("/temp", "./temp")
+			s.AddStaticPath("/resource", "./resource")
 			s.Run()
 			return nil
 		},
