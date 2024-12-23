@@ -270,27 +270,39 @@ func clearTempDir(dir string) error {
 	return nil
 }
 
-// 上传图片
+// 上传图片或头像
 func (c *User) UploadImg(req *ghttp.Request) {
 	files := req.GetUploadFiles("file")
+	typeVal := req.GetFormMap()["type"]
+
+	var targetPath string
+	if typeVal == nil || typeVal != "avatar" {
+		targetPath = getTemp()
+	} else {
+		targetPath = "./resource/avatar"
+	}
 	if files == nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "请选择需要上传的文件", nil)))
 	}
-	maxFiles := 5 // 文件阈值
-	// 检测temp 目录文件数量是否超出，超出则清空
-	TempFiles, err := os.ReadDir(getTemp())
-	if err != nil {
-		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "上传失败："+err.Error(), nil)))
-		return
-	}
-	// 清空操作
-	if len(TempFiles) > maxFiles {
-		// 清空temp目录
-		err = clearTempDir(getTemp())
+
+	if typeVal != "avatar" {
+		maxFiles := 5 // 文件阈值
+		// 检测目录文件数量是否超出，超出则清空
+		TempFiles, err := os.ReadDir(targetPath)
 		if err != nil {
 			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "上传失败："+err.Error(), nil)))
 			return
 		}
+		// 清空操作
+		if len(TempFiles) > maxFiles {
+			// 清空temp目录
+			err = clearTempDir(targetPath)
+			if err != nil {
+				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "上传失败："+err.Error(), nil)))
+				return
+			}
+		}
+
 	}
 
 	allowedMimeTypes := map[string]bool{
@@ -311,13 +323,13 @@ func (c *User) UploadImg(req *ghttp.Request) {
 		}
 	}
 
-	names, err := files.Save(getTemp())
+	names, err := files.Save(targetPath)
 	if err != nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "上传失败："+err.Error(), nil)))
 	}
 	cacheFilesStrings := make([]string, len(names)-1)
 	for _, val := range names {
-		cacheFilesStrings = append(cacheFilesStrings, getTemp()+"/"+val)
+		cacheFilesStrings = append(cacheFilesStrings, targetPath+"/"+val)
 	}
 	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(1, "上传成功", cacheFilesStrings)))
 }
