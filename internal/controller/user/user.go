@@ -149,6 +149,7 @@ func (c *User) GetUser(req *ghttp.Request) {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "验证失败", nil)))
 	}
 }
+
 func (c *User) GetFriend(req *ghttp.Request) {
 	data := req.GetFormMap()
 	tok := req.Header.Get("Authorization")
@@ -166,10 +167,15 @@ func (c *User) GetFriend(req *ghttp.Request) {
 	md := dao.Friends.Ctx(req.Context())
 	err = md.Where("user_id", data["user"].(string)).FieldsEx("friend_data.password").With(entity.User{}).Scan(&fData)
 	if err == nil {
-		var fDataEx = make([]*entity.Friends, len(fData)-1)
-		for _, i := range fData {
-			i.FriendData.Password = ""
-			fDataEx = append(fDataEx, &i)
+		var fDataEx []*entity.Friends
+		if len(fData) > 0 {
+			fDataEx = make([]*entity.Friends, len(fData)-1)
+			for _, i := range fData {
+				i.FriendData.Password = ""
+				fDataEx = append(fDataEx, &i)
+			}
+		} else {
+			fDataEx = make([]*entity.Friends, 0)
 		}
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(1, "OK", fDataEx)))
 	} else {
@@ -179,6 +185,7 @@ func (c *User) GetFriend(req *ghttp.Request) {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "验证失败", nil)))
 	}
 }
+
 func (c *User) AddFriend(req *ghttp.Request) {
 	md := g.Model("user")
 	data := req.GetFormMap()
@@ -197,14 +204,13 @@ func (c *User) AddFriend(req *ghttp.Request) {
 	if err == nil && res.Len() > 0 {
 		jtoken, _ := token.ParseJwt(tok)
 		if data["user"] != jtoken.Username {
-			token_username, _ := token.ParseJwt(tok)
-			res, _ = g.Model("friends").Where("user_id", token_username.Username).Where("friend_id", data["user"]).All()
+			res, _ = g.Model("friends").Where("user_id", jtoken.Username).Where("friend_id", data["user"]).All()
 			if res.Len() > 0 {
 				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "已经添加过好友了!", nil)))
 			}
 			md = dao.Friends.Ctx(req.Context())
 			_, err := md.Insert(g.Map{
-				"user_id":   token_username.Username,
+				"user_id":   jtoken.Username,
 				"friend_id": data["user"],
 				"add_time":  time.Now(),
 			})
@@ -222,6 +228,49 @@ func (c *User) AddFriend(req *ghttp.Request) {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "验证失败", nil)))
 	}
 }
+
+func (c *User) DeleteFriend(req *ghttp.Request) {
+	md := g.Model("user")
+	data := req.GetFormMap()
+	tok := req.Header.Get("Authorization")
+	if len(tok) == 0 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenInValid, "token校验失败！", nil)))
+	}
+	_, err := token.ValidToken(tok)
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenExpired, "token校验失败:"+err.Error(), nil)))
+	}
+	if len(data) == 0 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenEmpty, "空数据", nil)))
+	}
+	res, err := md.Where("username", data["user"]).All()
+	if err == nil && res.Len() > 0 {
+		jtoken, _ := token.ParseJwt(tok)
+		if data["user"] != jtoken.Username {
+			res, _ = g.Model("friends").Where("user_id", jtoken.Username).Where("friend_id", data["user"]).All()
+			if res.Len() == 0 {
+				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "未添加该好友!", nil)))
+			}
+			md = dao.Friends.Ctx(req.Context())
+			_, err := md.Delete(g.Map{
+				"user_id":   jtoken.Username,
+				"friend_id": data["user"],
+			})
+			if err != nil {
+				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "删除好友失败！", nil)))
+			}
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "删除好友成功！", nil)))
+		} else {
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "不能删除自己", nil)))
+		}
+	} else {
+		if res.Len() == 0 {
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "对方不存在", nil)))
+		}
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "验证失败", nil)))
+	}
+}
+
 func (c *User) SearchUsers(req *ghttp.Request) {
 	md := g.Model("user")
 	data := req.GetFormMap()
