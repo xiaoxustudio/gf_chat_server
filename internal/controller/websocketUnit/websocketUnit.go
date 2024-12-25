@@ -3,6 +3,7 @@ package websocketunit
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"gf_chat_server/internal/consts"
 	array "gf_chat_server/utility/array"
 	scmsg "gf_chat_server/utility/scMsg"
@@ -167,7 +168,7 @@ func (r *WebSocketUnit) HandleWebSocketMessage(conn *websocket.Conn, msg []byte)
 	} else if data.Type == consts.WithDraw { // 是否是撤回聊天消息
 		if res.Target != "" && res.UserName != "" {
 			index := data.Data.(g.Map)["index"].(float64)
-			tw.Tw(context.Background(), "撤回数据：%s %s ", res.UserName, res.Target)
+			// tw.Tw(context.Background(), "撤回数据：%s %s ", res.UserName, res.Target)
 			r.RemoveChat(res.UserName, res.Target, int(index))
 		}
 	}
@@ -348,11 +349,25 @@ func (r *WebSocketUnit) RemoveChat(un string, tg string, chatIndex int) {
 	ListToken := &r.ChatListData[index]
 	list := ListToken.ChatList
 	if chatIndex >= 0 && chatIndex < len(list) {
-		// 移除指定索引的聊天消息
-		ListToken.ChatList = array.RemoveItemFromArray(list, chatIndex)
-		// 同步聊天
 		UserName := ListToken.Users[0]
 		TargetName := ListToken.Users[1]
+		res, err := g.Model("user").Where("username", UserName).One()
+		if err != nil {
+			return
+		}
+		back, err := array.InsertIntoArray(list, chatIndex, ChatItem{
+			Type:    consts.System,
+			Content: fmt.Sprintf("%s(%s) 撤回了一条消息！", res.GMap().Get("nickname"), UserName),
+		})
+
+		if err == nil {
+			// 添加撤回系统消息
+			ListToken.ChatList = back
+		}
+
+		// 移除指定索引的聊天消息
+		ListToken.ChatList = array.RemoveItemFromArray(ListToken.ChatList, chatIndex+1)
+		// 同步聊天
 		r.SyncChat(UserName)
 		r.SyncChat(TargetName)
 	}
