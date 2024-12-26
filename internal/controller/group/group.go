@@ -233,6 +233,31 @@ func (c *Group) GetGroup(req *ghttp.Request) {
 	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取群组失败!", nil)))
 }
 
+// 根据群聊ID获取群所有成员
+func (c *Group) GetGroupMembers(req *ghttp.Request) {
+	_, err := c.validToken(req)
+	data := req.GetFormMap()
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, fmt.Sprintf("获取成员失败：%s", err.Error()), nil)))
+	}
+	if data == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取成员失败：缺少参数", nil)))
+	}
+	md := g.Model("groups")
+	group_id := data["group"].(string)
+	res, err := md.Where("group_id", group_id).One()
+	if err != nil || len(res) == 0 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "未找到该群！!", nil)))
+	}
+	md = g.Model(fmt.Sprintf("group-%s", group_id))
+	var adata []entity.GroupTemplate
+	err = md.With(entity.User{}).Scan(&adata)
+	if err == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", adata)))
+	}
+	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取成员失败!"+err.Error(), nil)))
+}
+
 // 根据群聊名称/ID搜索群聊
 func (c *Group) SearchGroup(req *ghttp.Request) {
 	_, err := c.validToken(req)

@@ -15,4 +15,5 @@ type GroupTemplate struct {
 	Auth         int         `json:"auth"           orm:"auth"           ` // 用户权限：0 普通 1管理 2群主
 	AddTime      *gtime.Time `json:"add_time"       orm:"add_time"       ` // 加入群聊时间
 	LastChatTime *gtime.Time `json:"last_chat_time" orm:"last_chat_time" ` // 最后发言时间
+	UserData *User `json:"user_data" orm:"with:username=user_id"` // ID
 }
