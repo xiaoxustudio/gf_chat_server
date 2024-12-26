@@ -160,6 +160,11 @@ func (r *WebSocketUnitGroup) HandleWebSocketMessage(conn *websocket.Conn, msg []
 		tw.Tw(context.Background(), "消息通道创建：%s", data.Data.(g.Map)["group"])
 		GroupIDName := data.Data.(g.Map)["group"].(string)
 		res.GroupID = GroupIDName
+		index := r.getGroupList(res.GroupID)
+		if index != -1 {
+			ct := &r.ChatListData[index]
+			ct.Users = append(ct.Users, res.UserName)
+		}
 		// 同步历史消息（如果有的话）
 		r.SyncChat(res.GroupID)
 	} else if data.Type == consts.Send { // 是否是发送聊天消息
