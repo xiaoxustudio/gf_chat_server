@@ -207,6 +207,9 @@ func (c *Group) GetJoinGroup(req *ghttp.Request) {
 	var gdata []*entity.GroupConnect
 	err = md.Where("user_id", data["user"].(string)).With(entity.Groups{}).Scan(&gdata)
 	if err == nil {
+		if gdata == nil {
+			gdata = make([]*entity.GroupConnect, 0)
+		}
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(1, "ok", gdata)))
 	}
 	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取群组失败", nil)))
@@ -228,4 +231,59 @@ func (c *Group) GetGroup(req *ghttp.Request) {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", res)))
 	}
 	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取群组失败!", nil)))
+}
+
+// 根据群聊名称/ID搜索群聊
+func (c *Group) SearchGroup(req *ghttp.Request) {
+	_, err := c.validToken(req)
+	data := req.GetFormMap()
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, fmt.Sprintf("获取群组失败：%s", err.Error()), nil)))
+	}
+	if data == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取群组失败：缺少参数", nil)))
+	}
+	group_id := data["group"].(string)
+	res, err := g.Model("groups").Where("group_id", group_id).All()
+	if err == nil && len(res) > 0 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", res)))
+	}
+	res, err = g.Model("groups").WhereLike("group_name", fmt.Sprintf("%%%s%%", group_id)).All()
+	if err == nil && len(res) > 0 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", res)))
+	}
+	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取群组失败!", nil)))
+}
+
+// 加入群组
+func (c *Group) JoinGroup(req *ghttp.Request) {
+	tok, err := c.validToken(req)
+	data := req.GetFormMap()
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, fmt.Sprintf("加入群组失败：%s", err.Error()), nil)))
+	}
+	if data == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "加入群组失败：缺少参数", nil)))
+	}
+	md := g.Model("groups")
+	group_id := data["group"].(string)
+	res, err := md.Where("group_id", group_id).One()
+	if err == nil {
+		if len(res) > 0 {
+			md = g.Model(fmt.Sprintf("group-%s", group_id))
+			_, err := md.Insert(&entity.GroupTemplate{
+				UserId:  tok.Username,
+				AddTime: gtime.Now()})
+			_, err1 := g.Model("group-connect").Insert(&entity.GroupConnect{
+				UserId:  tok.Username,
+				GroupId: group_id,
+				AddTime: gtime.Now(), Auth: 0})
+			if err == nil && err1 == nil {
+				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "加入群组成功！", nil)))
+			}
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "加入群组失败！", nil)))
+		}
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "未找到该群！", nil)))
+	}
+	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "加入群组失败!", nil)))
 }
