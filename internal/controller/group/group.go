@@ -291,3 +291,33 @@ func (c *Group) JoinGroup(req *ghttp.Request) {
 	}
 	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "加入群组失败!", nil)))
 }
+
+// 根据群聊ID退出群聊
+func (c *Group) ExitGroup(req *ghttp.Request) {
+	tok, err := c.validToken(req)
+	data := req.GetFormMap()
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, fmt.Sprintf("退出群组失败：%s", err.Error()), nil)))
+	}
+	if data == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "退出群组失败：缺少参数", nil)))
+	}
+	group_id := data["group"].(string)
+	// 判断是否有该群聊
+	resG, err := g.Model("groups").Where("group_id", group_id).All()
+	if err == nil && len(resG) > 0 {
+		// 判断是否加入了该群
+		mdG := g.Model(fmt.Sprintf("group-%s", group_id))
+		res, err := mdG.Where("user_id", tok.Username).All()
+		if err == nil && len(res) > 0 {
+			_, err := mdG.Delete("user_id", tok.Username)
+			_, err1 := g.Model("group-connect").Where("user_id", tok.Username).Where("group_id", group_id).Delete()
+			if err == nil && err1 == nil {
+				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", nil)))
+			}
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "退出群组失败!", nil)))
+		}
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "退出群组失败：未加入群聊!", nil)))
+	}
+	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "退出群组失败：未找到群聊!", nil)))
+}
