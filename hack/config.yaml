@@ -4,7 +4,7 @@ gfcli:
   gen:
     dao:
       link: "mysql:root:xuranyyds@tcp(127.0.0.1:3306)/server_table?loc=Local&parseTime=True"
-      tables: "user,friends,messages"
+      tables: "user,friends,messages,groups,group-connect,group-template"
       jsonCase: "Snake"
   docker:
     build: "-a amd64 -s linux -p temp -ew"
