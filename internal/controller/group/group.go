@@ -271,7 +271,11 @@ func (c *Group) JoinGroup(req *ghttp.Request) {
 	if err == nil {
 		if len(res) > 0 {
 			md = g.Model(fmt.Sprintf("group-%s", group_id))
-			_, err := md.Insert(&entity.GroupTemplate{
+			res, err := md.Where("user_id", tok.Username).All()
+			if len(res) > 0 && err == nil {
+				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "已经加入进群了！", nil)))
+			}
+			_, err = md.Insert(&entity.GroupTemplate{
 				UserId:  tok.Username,
 				AddTime: gtime.Now()})
 			_, err1 := g.Model("group-connect").Insert(&entity.GroupConnect{
