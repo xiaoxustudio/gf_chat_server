@@ -3,6 +3,7 @@ package group
 import (
 	"errors"
 	"fmt"
+	"gf_chat_server/internal/consts"
 	"gf_chat_server/internal/dao"
 	"gf_chat_server/internal/model/entity"
 	"gf_chat_server/utility/msgtoken"
@@ -145,7 +146,7 @@ CREATE TABLE ` + tableName + ` (
 				"auth":     2,
 			})
 			if err == nil {
-				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(1, "ok", g.Map{"group_id": group_id})))
+				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", g.Map{"group_id": group_id})))
 			}
 			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "创建群组错误！", nil)))
 		}
@@ -212,7 +213,7 @@ func (c *Group) GetJoinGroup(req *ghttp.Request) {
 }
 
 // 根据群聊ID获取群聊信息
-func (c *Group) GetGroupInfo(req *ghttp.Request) {
+func (c *Group) GetGroup(req *ghttp.Request) {
 	_, err := c.validToken(req)
 	data := req.GetFormMap()
 	if err != nil {
@@ -221,5 +222,10 @@ func (c *Group) GetGroupInfo(req *ghttp.Request) {
 	if data == nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取群组失败：缺少参数", nil)))
 	}
-	// md := g.Model("groups")
+	md := g.Model("groups")
+	res, err := md.Where("group_id", data["group"].(string)).One()
+	if err == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", res)))
+	}
+	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取群组失败!", nil)))
 }

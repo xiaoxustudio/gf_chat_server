@@ -32,6 +32,7 @@ import (
 	"gf_chat_server/internal/controller/home"
 	"gf_chat_server/internal/controller/user"
 	websocketunit "gf_chat_server/internal/controller/websocketUnit"
+	"gf_chat_server/internal/controller/websocketUnitGroup"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
@@ -52,9 +53,13 @@ var (
 		Func: func(ctx context.Context, parser *gcmd.Parser) (err error) {
 			s := g.Server()
 			imc := websocketunit.New()
+			gimc := websocketUnitGroup.New()
 
 			s.BindHandler("/imc", func(r *ghttp.Request) { // 聊天websocket
 				imc.HandleWebSocket(r.Response.Writer, r.Request)
+			})
+			s.BindHandler("/gimc", func(r *ghttp.Request) { // 聊天websocket
+				gimc.HandleWebSocket(r.Response.Writer, r.Request)
 			})
 			s.Group("/user", func(group *ghttp.RouterGroup) { // 用户相关接口
 				group.Middleware(ghttp.MiddlewareHandlerResponse)
