@@ -1,6 +1,8 @@
 package group
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"gf_chat_server/internal/consts"
@@ -9,6 +11,8 @@ import (
 	"gf_chat_server/utility/msgtoken"
 	"gf_chat_server/utility/rand"
 	"gf_chat_server/utility/token"
+	"gf_chat_server/utility/tw"
+	"strconv"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
@@ -345,4 +349,85 @@ func (c *Group) ExitGroup(req *ghttp.Request) {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "退出群组失败：未加入群聊!", nil)))
 	}
 	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "退出群组失败：未找到群聊!", nil)))
+}
+
+// 根据群聊ID和用户名获取用户
+func (c *Group) GetGroupMember(req *ghttp.Request) {
+	data := req.GetFormMap()
+	if data == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取群成员失败：缺少参数", nil)))
+	}
+	md := g.Model("groups")
+	group_id := data["group"].(string)
+	user_id := data["user"].(string)
+	res, err := md.Where("group_id", group_id).One()
+	if err != nil || len(res) == 0 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "未找到该群！!", nil)))
+	}
+	md = g.Model(fmt.Sprintf("group-%s", group_id))
+	res, err = md.Where("user_id", user_id).One()
+	if err == nil {
+		if len(res) > 0 {
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", res)))
+		}
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "未找到该用户！", nil)))
+	}
+	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取群成员失败!"+err.Error(), nil)))
+}
+
+// 根据群聊ID和用户名设置用户权限（群主）
+func (c *Group) SetMemberAuth(req *ghttp.Request) {
+	tok, err := c.validToken(req)
+	data := req.GetFormMap()
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, fmt.Sprintf("设置群成员权限失败：%s", err.Error()), nil)))
+	}
+	if data == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "设置群成员权限失败：缺少参数", nil)))
+	}
+	md := g.Model("groups")
+	group_id := data["group"].(string)
+	tw.Tw(context.Background(), "从网上 %s", data["auth"])
+	user_id := data["user"].(string)
+	need_auth, err := strconv.Atoi(string(data["auth"].(json.Number)))
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "设置群成员权限失败：权限码错误！", nil)))
+		return
+	}
+
+	if need_auth != 0 && need_auth != 1 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "设置群成员权限失败：未知权限！", nil)))
+	} else if need_auth == 2 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "设置群成员权限失败：无法重新设置群主！", nil)))
+	}
+	res, err := md.Where("group_id", group_id).One()
+	if err != nil || len(res) == 0 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "未找到该群！", nil)))
+	}
+	md = g.Model(fmt.Sprintf("group-%s", group_id))
+	res, err = md.Clone().Where("user_id", tok.Username).One()
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "设置群成员权限失败："+err.Error(), nil)))
+	}
+	if res.GMap().Get("auth").(int32) != 2 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "设置群成员权限失败：自身权限不足!", nil)))
+	}
+	res, err = md.Clone().Where("user_id", user_id).One()
+	if err == nil {
+		if len(res) > 0 {
+			if res.GMap().Get("auth").(int32) == 2 {
+				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "无法设置群主权限！", nil)))
+			}
+			if res.GMap().Get("auth").(int32) == int32(need_auth) {
+				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "重复设置！", nil)))
+			}
+			_, err := md.Clone().Where("user_id", user_id).Update(g.Map{"auth": need_auth})
+			if err == nil {
+				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", res)))
+			}
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "设置群成员权限失败！"+err.Error(), nil)))
+		}
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "未找到该用户！", nil)))
+	}
+	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "设置群成员权限失败!"+err.Error(), nil)))
 }
