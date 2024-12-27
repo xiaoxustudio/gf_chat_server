@@ -208,25 +208,49 @@ func (r *WebSocketUnitGroup) sendHeartbeat() {
 	for {
 		time.Sleep(HeartBeatDelay) // 心跳间隔时间
 
+		// 使用读写锁来提高并发性能
 		pool.Lock.Lock()
+		connections := make(map[*WebSocketConnection]bool)
 		for wsConn := range pool.Connections {
+			connections[wsConn] = true
+		}
+		pool.Lock.Unlock()
+
+		for wsConn := range connections {
 			// 发送心跳消息
-			var NewData = scmsg.SCMsgO{Type: consts.HeartBeatServer, Message: "server hearbeat"}
-			NewDataBytes, err := json.Marshal(NewData)
+			var newData = scmsg.SCMsgO{Type: consts.HeartBeatServer, Message: "server heartbeat"}
+			newDataBytes, err := json.Marshal(newData)
 			if err != nil {
-				return
+				// 记录错误，而不是直接返回
+				tw.Tw(context.Background(), "Error marshalling heartbeat message: %v", err)
+				continue
 			}
-			err = wsConn.Conn.WriteMessage(websocket.TextMessage, NewDataBytes)
+
+			err = wsConn.Conn.WriteMessage(websocket.TextMessage, newDataBytes)
 			if err != nil {
-				delete(pool.Connections, wsConn)
-				wsConn.Conn.Close()
+				// 错误处理：删除连接并关闭
+				r.handleConnectionError(wsConn)
 			} else {
 				// 更新心跳状态
 				wsConn.LastPing = time.Now()
 			}
 		}
-		pool.Lock.Unlock()
 	}
+}
+
+func (r *WebSocketUnitGroup) handleConnectionError(wsConn *WebSocketConnection) {
+	// 锁定写操作
+	r.WebSocketPool.Lock.Lock()
+	defer r.WebSocketPool.Lock.Unlock()
+
+	// 删除连接并关闭
+	if _, ok := r.WebSocketPool.Connections[wsConn]; ok {
+		delete(r.WebSocketPool.Connections, wsConn)
+		wsConn.Conn.Close()
+	}
+
+	// 记录错误信息
+	tw.Tw(context.Background(), "Error sending heartbeat to connection: %v", wsConn.Conn.RemoteAddr())
 }
 
 // 聊天消息处理
