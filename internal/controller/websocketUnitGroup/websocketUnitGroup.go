@@ -158,8 +158,20 @@ func (r *WebSocketUnitGroup) HandleWebSocketMessage(conn *websocket.Conn, msg []
 		res.HearbeatLastTime = gtime.Now().Unix()
 	} else if data.Type == consts.CreateChannel { // 是否是建立连接
 		tw.Tw(context.Background(), "消息通道创建：%s", data.Data.(g.Map)["group"])
-		GroupIDName := data.Data.(g.Map)["group"].(string)
-		res.GroupID = GroupIDName
+		group_id := data.Data.(g.Map)["group"].(string)
+		// 判断是否加入群聊
+		md := g.Model(fmt.Sprintf("group-%s", group_id))
+		resSelf, err := md.Clone().Where("user_id", res.UserName).One()
+		if err != nil {
+			// "失败"+err.Error()
+			res.Conn.Close()
+			return
+		} else if len(resSelf) == 0 {
+			// "你还未加入群聊"
+			res.Conn.Close()
+			return
+		}
+		res.GroupID = group_id
 		index := r.getGroupList(res.GroupID)
 		if index != -1 {
 			ct := &r.ChatListData[index]
