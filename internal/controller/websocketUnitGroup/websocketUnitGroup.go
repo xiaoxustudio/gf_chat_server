@@ -35,14 +35,15 @@ type WebSocketPool struct {
 }
 
 type ChatItem struct {
-	NickName  string              `json:"nickname"`
-	Avatar    string              `json:"avatar"`
-	SendID    string              `json:"send_id"`
-	ReceiveID string              `json:"receive_id"`
-	Content   string              `json:"content"`
-	Time      string              `json:"time"`
-	Files     []string            `json:"files"`
-	Type      consts.ChatItemType `json:"type"`
+	NickName  string                `json:"nickname"`
+	Avatar    string                `json:"avatar"`
+	SendID    string                `json:"send_id"`
+	ReceiveID string                `json:"receive_id"`
+	Content   string                `json:"content"`
+	Time      string                `json:"time"`
+	Files     []string              `json:"files"`
+	Type      consts.ChatItemType   `json:"type"`
+	SendData  *entity.GroupTemplate `json:"send_data"`
 }
 
 // 群组聊天单元
@@ -126,7 +127,6 @@ func (r *WebSocketUnitGroup) HandleWebSocket(ResponseWriter http.ResponseWriter,
 			// 连接关闭时从连接池中移除
 			pool.Lock.Lock()
 			delete(pool.Connections, wsConn)
-			r.RemoveChatSlot(wsConn.UserName)
 			pool.Lock.Unlock()
 			conn.Close()
 		}()
@@ -329,6 +329,12 @@ func (r *WebSocketUnitGroup) OnMessage(connect *WebSocketConnection, data scmsg.
 			ImageStrings[i] = str
 		}
 	}
+	md = g.Model(fmt.Sprintf("group-%s", connect.GroupID))
+	var mdata entity.GroupTemplate
+	err = md.Clone().Where("user_id", connect.UserName).With(&entity.User{}).Scan(&mdata)
+	if err != nil {
+		return
+	}
 
 	ListToken := &r.ChatListData[index]
 	ListToken.ChatList = append(ListToken.ChatList, ChatItem{
@@ -340,6 +346,12 @@ func (r *WebSocketUnitGroup) OnMessage(connect *WebSocketConnection, data scmsg.
 		Time:      gtime.Datetime(),
 		Type:      consts.Common,
 		Files:     ImageStrings,
+		SendData: &entity.GroupTemplate{
+			UserId:   mdata.UserId,
+			Auth:     mdata.Auth,
+			AddTime:  mdata.AddTime,
+			UserData: mdata.UserData,
+		},
 	})
 	r.SyncChat(connect.GroupID)
 }
@@ -381,29 +393,12 @@ func (r *WebSocketUnitGroup) SyncChat(group_id string) {
 	}
 	// 循环发送
 	for _, v := range ListToken.Users {
+		tw.Tw(context.Background(), "用户%s", v)
 		wsRes := r.GetWsForUsername(v)
-		if wsRes == nil {
-			return
+		if wsRes != nil {
+			r.SyncChatAvatar(group_id, v)
+			wsRes.Conn.WriteMessage(websocket.TextMessage, NewDataBytes)
 		}
-		r.SyncChatAvatar(group_id, v)
-		wsRes.Conn.WriteMessage(websocket.TextMessage, NewDataBytes)
-	}
-}
-
-// 移除指定用户的聊天消息列表
-func (r *WebSocketUnitGroup) RemoveChatSlot(un string) {
-	index := r.getGroupList(un)
-	if index == -1 {
-		return
-	}
-	ListToken := r.ChatListData[index]
-	UserName := ListToken.Users[0]
-	GroupIDName := ListToken.Users[1]
-	link1 := r.GetWsForUsername(UserName)
-	link2 := r.GetWsForUsername(GroupIDName)
-	if link1 == nil && link2 == nil {
-		// 双方都断开连接，保存记录到数据库，并删除内存聊天数据
-		// r.ChatListData = append(r.ChatListData[:index-1], r.ChatListData[index:]...)
 	}
 }
 
