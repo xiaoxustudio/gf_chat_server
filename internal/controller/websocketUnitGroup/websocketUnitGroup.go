@@ -126,6 +126,20 @@ func (r *WebSocketUnitGroup) HandleWebSocket(ResponseWriter http.ResponseWriter,
 		defer func() {
 			// 连接关闭时从连接池中移除
 			pool.Lock.Lock()
+			// 将users中剔除用户
+			var group_id = wsConn.GroupID
+			index := r.getGroupList(group_id)
+			if index == -1 {
+				return
+			}
+			ListToken := &r.ChatListData[index]
+			var NewUsers = make([]string, len(ListToken.Users))
+			for _, v := range ListToken.Users {
+				if v != wsConn.UserName {
+					NewUsers = append(NewUsers, v)
+				}
+			}
+			ListToken.Users = NewUsers
 			delete(pool.Connections, wsConn)
 			pool.Lock.Unlock()
 			conn.Close()
@@ -426,7 +440,6 @@ func (r *WebSocketUnitGroup) SyncChat(group_id string) {
 	r.SyncChatUserData(group_id)
 	// 循环发送
 	for _, v := range ListToken.Users {
-		tw.Tw(context.Background(), "用户%s", v)
 		wsRes := r.GetWsForUsername(v)
 		if wsRes != nil {
 			r.SyncChatAvatar(group_id, v)
