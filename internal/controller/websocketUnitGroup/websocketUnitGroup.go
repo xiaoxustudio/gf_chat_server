@@ -356,6 +356,37 @@ func (r *WebSocketUnitGroup) OnMessage(connect *WebSocketConnection, data scmsg.
 	r.SyncChat(connect.GroupID)
 }
 
+// 传入group_id，获取所有用户记录
+func (r *WebSocketUnitGroup) getChatUserData(group_id string) g.Map {
+	md := g.Model(fmt.Sprintf("group-%s", group_id))
+	var mdata []*entity.GroupTemplate
+	arrs := make(g.Map, len(mdata))
+
+	err := md.With(&entity.User{}).Scan(&mdata)
+	if err != nil {
+		return arrs
+	}
+	for _, data := range mdata {
+		username := data.UserId
+		arrs[username] = data
+	}
+	return arrs
+}
+
+// 更新同步用户记录
+func (r *WebSocketUnitGroup) SyncChatUserData(group_id string) {
+	index := r.getGroupList(group_id)
+	if index == -1 {
+		return
+	}
+	ListToken := r.ChatListData[index]
+	data := r.getChatUserData(group_id)
+	// 循环发送
+	for i, v := range ListToken.ChatList {
+		ListToken.ChatList[i].SendData = data[v.SendData.UserId].(*entity.GroupTemplate)
+	}
+}
+
 // 获取指定用户的头像
 func (r *WebSocketUnitGroup) GetChatAvatar(username string) string {
 	res, err := g.Model("user").Where("username", username).One()
@@ -391,6 +422,8 @@ func (r *WebSocketUnitGroup) SyncChat(group_id string) {
 	if err != nil {
 		return
 	}
+	// 更新user_data
+	r.SyncChatUserData(group_id)
 	// 循环发送
 	for _, v := range ListToken.Users {
 		tw.Tw(context.Background(), "用户%s", v)
@@ -400,6 +433,7 @@ func (r *WebSocketUnitGroup) SyncChat(group_id string) {
 			wsRes.Conn.WriteMessage(websocket.TextMessage, NewDataBytes)
 		}
 	}
+
 }
 
 // 移除指定用户的指定聊天消息
