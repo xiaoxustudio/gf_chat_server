@@ -1,7 +1,6 @@
 package group
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,7 +10,6 @@ import (
 	"gf_chat_server/utility/msgtoken"
 	"gf_chat_server/utility/rand"
 	"gf_chat_server/utility/token"
-	"gf_chat_server/utility/tw"
 	"strconv"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -351,7 +349,7 @@ func (c *Group) ExitGroup(req *ghttp.Request) {
 	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "退出群组失败：未找到群聊!", nil)))
 }
 
-// 根据群聊ID和用户名获取用户
+// 根据群聊ID和用户名获取成员
 func (c *Group) GetGroupMember(req *ghttp.Request) {
 	data := req.GetFormMap()
 	if data == nil {
@@ -375,7 +373,7 @@ func (c *Group) GetGroupMember(req *ghttp.Request) {
 	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取群成员失败!"+err.Error(), nil)))
 }
 
-// 根据群聊ID和用户名设置用户权限（群主）
+// 根据群聊ID和用户名设置成员权限（群主）
 func (c *Group) SetMemberAuth(req *ghttp.Request) {
 	tok, err := c.validToken(req)
 	data := req.GetFormMap()
@@ -387,7 +385,6 @@ func (c *Group) SetMemberAuth(req *ghttp.Request) {
 	}
 	md := g.Model("groups")
 	group_id := data["group"].(string)
-	tw.Tw(context.Background(), "从网上 %s", data["auth"])
 	user_id := data["user"].(string)
 	need_auth, err := strconv.Atoi(string(data["auth"].(json.Number)))
 	if err != nil {
@@ -405,12 +402,17 @@ func (c *Group) SetMemberAuth(req *ghttp.Request) {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "未找到该群！", nil)))
 	}
 	md = g.Model(fmt.Sprintf("group-%s", group_id))
-	res, err = md.Clone().Where("user_id", tok.Username).One()
+	resSelf, err := md.Clone().Where("user_id", tok.Username).One()
 	if err != nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "设置群成员权限失败："+err.Error(), nil)))
+	} else if len(resSelf) == 0 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "你还未加入群聊", nil)))
 	}
-	if res.GMap().Get("auth").(int32) != 2 {
-		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "设置群成员权限失败：自身权限不足!", nil)))
+	res, err = md.Clone().Where("user_id", user_id).One()
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "设置群成员权限失败："+err.Error(), nil)))
+	} else if len(res) == 0 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "该成员未加群！", nil)))
 	}
 	res, err = md.Clone().Where("user_id", user_id).One()
 	if err == nil {
@@ -430,4 +432,53 @@ func (c *Group) SetMemberAuth(req *ghttp.Request) {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "未找到该用户！", nil)))
 	}
 	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "设置群成员权限失败!"+err.Error(), nil)))
+}
+
+// 根据群聊ID和用户名踢出成员（群主或管理员）
+func (c *Group) KickMember(req *ghttp.Request) {
+	tok, err := c.validToken(req)
+	data := req.GetFormMap()
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, fmt.Sprintf("踢出群成员失败：%s", err.Error()), nil)))
+	}
+	if data == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "踢出群成员失败：缺少参数", nil)))
+	}
+	md := g.Model("groups")
+	group_id := data["group"].(string)
+	user_id := data["user"].(string)
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "踢出群成员失败：权限码错误！", nil)))
+		return
+	}
+
+	res, err := md.Where("group_id", group_id).One()
+	if err != nil || len(res) == 0 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "未找到该群！", nil)))
+	}
+	md = g.Model(fmt.Sprintf("group-%s", group_id))
+	resSelf, err := md.Clone().Where("user_id", tok.Username).One()
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "踢出群成员失败："+err.Error(), nil)))
+	} else if len(resSelf) == 0 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "你还未加入群聊", nil)))
+	}
+	res, err = md.Clone().Where("user_id", user_id).One()
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "踢出群成员失败："+err.Error(), nil)))
+	} else if len(res) == 0 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "该成员未加群！", nil)))
+	}
+	if resSelf.GMap().Get("auth").(int32) == 0 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "踢出群成员失败：自身权限不足!", nil)))
+	}
+	_, err = md.Clone().Delete(g.Map{
+		"user_id": user_id})
+	_, err1 := g.Model("group-connect").Delete(g.Map{
+		"user_id":  user_id,
+		"group_id": group_id})
+	if err == nil && err1 == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "踢出群成员成功！", nil)))
+	}
+	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "踢出群成员失败："+err.Error(), nil)))
 }
