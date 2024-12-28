@@ -1,14 +1,16 @@
 package user
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"gf_chat_server/internal/consts"
+	emailsend "gf_chat_server/internal/controller/emailSend"
 	"gf_chat_server/internal/dao"
 	"gf_chat_server/internal/model/entity"
+	"gf_chat_server/utility/iptool"
 	"gf_chat_server/utility/msgtoken"
+	"gf_chat_server/utility/rand"
 	"gf_chat_server/utility/token"
-	"gf_chat_server/utility/tw"
 	"gf_chat_server/utility/verifiy"
 	"gf_chat_server/utility/xtime"
 	"os"
@@ -17,14 +19,18 @@ import (
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
+	"github.com/gogf/gf/v2/os/gtime"
 	"github.com/gogf/gf/v2/util/gconv"
 )
 
-type User struct{}
+type User struct {
+	EmailIns emailsend.EmailSendIns
+}
 
 func New() *User {
-	return &User{}
+	return &User{EmailIns: emailsend.New()}
 }
+
 func (c *User) ValidToken(req *ghttp.Request) {
 	md := g.Model("user")
 	data := req.GetFormMap()
@@ -52,7 +58,6 @@ func (c *User) Register(req *ghttp.Request) {
 	md := g.Model("user")
 	data := req.GetFormMap()
 
-	tw.Tw(context.TODO(), "%v", data) // 打印
 	if len(data) == 0 {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.DataEmpty, "空数据", nil)))
 	}
@@ -81,6 +86,7 @@ func (c *User) Register(req *ghttp.Request) {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "服务发生错误："+err.Error(), nil)))
 	}
 }
+
 func (c *User) Login(req *ghttp.Request) {
 	md := g.Model("user")
 	data := req.GetFormMap()
@@ -405,4 +411,78 @@ func (c *User) ChangeAvatar(req *ghttp.Request) {
 	} else {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "修改失败！"+err.Error(), nil)))
 	}
+}
+
+// 指定邮件人发送验证码（内部）
+func (c *User) sendEmailToken(req *ghttp.Request, addr string) (string, error) {
+	ip, err := iptool.GetIP(req.Request)
+	if err != nil {
+		return "", errors.New("发送邮件失败！")
+	}
+	tk := rand.GetID(6)
+	if len(tk) == 0 {
+		return "", errors.New("发送邮件失败！")
+	}
+	md := g.Model("tokens")
+	var tdata []entity.Tokens
+	err = md.Clone().Where("target_email", addr).WithAll().Scan(&tdata)
+	if err != nil {
+		return "", errors.New("发送邮件失败！")
+	}
+	if len(tdata) == 3 {
+		_, err = md.Clone().Insert(entity.Tokens{
+			Token:       tk,
+			CreateTime:  gtime.Now(),
+			FailureTime: gtime.Now().Add(time.Duration(60) * time.Second), // 1分钟
+			TargetEmail: addr,
+			Ip:          ip,
+		})
+		if err != nil {
+			return "", errors.New("发送邮件失败Db：超过次数！")
+		}
+		return "", errors.New("发送邮件失败：超过次数！")
+	} else if len(tdata) == 4 {
+		// 判断是否到1分钟，1分钟后可重新发送验证码
+		dur_time := time.Duration(10) * time.Second
+		lastRow := tdata[len(tdata)-1]
+		timeInstan := time.Now().Add(dur_time)
+		p := timeInstan.Before(lastRow.CreateTime.Time)
+		if !p {
+			return "", errors.New("发送邮件失败：请过1分钟后再试！")
+		}
+		// 先清空全部，再发送
+		_, err = md.Clone().Delete(entity.Tokens{TargetEmail: addr})
+		if err != nil {
+			return "", errors.New("发送邮件失败：请过1分钟后再试！")
+		}
+		return c.sendEmailToken(req, addr)
+	}
+	// 发送邮件
+	c.EmailIns.Send(addr, fmt.Sprintf("您的验证码为：%s \n IP : %s \n 1分钟内有效", tk, ip))
+	// 记录token
+	_, err = md.Clone().Insert(entity.Tokens{
+		Token:       tk,
+		CreateTime:  gtime.Now(),
+		FailureTime: gtime.Now().Add(time.Duration(60) * time.Second), // 1分钟
+		TargetEmail: addr,
+		Ip:          ip,
+	})
+	if err != nil {
+		return "", errors.New("发送邮件失败Db")
+	}
+	return ip, nil
+}
+
+// 向指定邮箱发送验证码链接
+func (c *User) SendEmail(req *ghttp.Request) {
+	data := req.GetFormMap()
+	if len(data) == 0 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenEmpty, "空数据", nil)))
+	}
+	email := data["email"].(string)
+	res, err := c.sendEmailToken(req, email)
+	if err == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "发送成功!", g.Map{"ip": res})))
+	}
+	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "发送失败："+err.Error(), nil)))
 }

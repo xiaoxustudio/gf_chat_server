@@ -48,10 +48,9 @@ type ChatItem struct {
 
 // 群组聊天单元
 type ChatToken struct {
-	Users        []string // 连接的成员
-	UsersAvatars []string
-	ChatList     []ChatItem
-	GroupInfo    *entity.Groups // 群组信息
+	Users     []string // 连接的成员
+	ChatList  []ChatItem
+	GroupInfo *entity.Groups // 群组信息
 }
 
 var upgrader = websocket.Upgrader{
@@ -62,7 +61,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-const HeartBeatDelay = time.Duration(10) * time.Second // 5s
+const HeartBeatDelay = time.Duration(10) * time.Second // 10s
 
 // websocket
 type WebSocketUnitGroup struct {
@@ -319,9 +318,8 @@ func (r *WebSocketUnitGroup) OnMessage(connect *WebSocketConnection, data scmsg.
 	if index == -1 {
 		// 创建新记录并更新头像
 		var listTk = ChatToken{
-			Users:        []string{connect.UserName},
-			UsersAvatars: []string{res.GMap().Get("avatar").(string)},
-			ChatList:     []ChatItem{},
+			Users:    []string{connect.UserName},
+			ChatList: []ChatItem{},
 			GroupInfo: &entity.Groups{
 				GroupId:     gres.GMap().Get("group_id").(string),
 				GroupStatus: int(gres.GMap().Get("group_status").(int32)),

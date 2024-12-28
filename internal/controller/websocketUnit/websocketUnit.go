@@ -59,7 +59,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-const HeartBeatDelay = time.Duration(10) * time.Second // 5s
+const HeartBeatDelay = time.Duration(10) * time.Second // 10s
 
 // websocket
 type WebSocketUnit struct {
