@@ -100,7 +100,16 @@ func (c *Group) CreateGroup(req *ghttp.Request) {
 	if data == nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "创建群组失败：缺少参数", nil)))
 	}
-	md := g.Model("groups")
+	var udata entity.User
+	md := dao.User.Ctx(req.Context())
+	err = md.Where("username", tk.Username).Scan(&udata)
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "用户异常", nil)))
+	}
+	if udata.EmailAuth != 1 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "用户邮箱未验证，无法创建群聊", nil)))
+	}
+	md = g.Model("groups")
 	group_id := rand.GenUniqueID()
 	tableName := fmt.Sprintf("`group-%s`", group_id)
 	res, err := md.Where("group_id", group_id).One()
