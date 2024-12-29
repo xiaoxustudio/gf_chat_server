@@ -9,11 +9,11 @@ import (
 	"github.com/gogf/gf/v2/os/gtime"
 )
 
-// Tokens is the golang structure of table tokens for DAO operations like Where/Data.
-type Tokens struct {
-	g.Meta      `orm:"table:tokens, do:true"`
+// Codes is the golang structure of table codes for DAO operations like Where/Data.
+type Codes struct {
+	g.Meta      `orm:"table:codes, do:true"`
 	Id          interface{} // ID
-	Token       interface{} // Token
+	Code        interface{} // Token
 	CreateTime  *gtime.Time // 创建时间
 	FailureTime *gtime.Time // 失效时间
 	TargetEmail interface{} // 目标邮箱

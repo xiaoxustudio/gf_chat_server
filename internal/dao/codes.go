@@ -8,19 +8,19 @@ import (
 	"gf_chat_server/internal/dao/internal"
 )
 
-// internalTokensDao is internal type for wrapping internal DAO implements.
-type internalTokensDao = *internal.TokensDao
+// internalCodesDao is internal type for wrapping internal DAO implements.
+type internalCodesDao = *internal.CodesDao
 
-// tokensDao is the data access object for table tokens.
+// codesDao is the data access object for table codes.
 // You can define custom methods on it to extend its functionality as you wish.
-type tokensDao struct {
-	internalTokensDao
+type codesDao struct {
+	internalCodesDao
 }
 
 var (
-	// Tokens is globally public accessible object for table tokens operations.
-	Tokens = tokensDao{
-		internal.NewTokensDao(),
+	// Codes is globally public accessible object for table codes operations.
+	Codes = codesDao{
+		internal.NewCodesDao(),
 	}
 )
 

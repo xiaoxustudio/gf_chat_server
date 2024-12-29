@@ -422,24 +422,24 @@ func (c *User) ChangeAvatar(req *ghttp.Request) {
 }
 
 // 指定邮件人发送验证码（内部）
-func (c *User) sendEmailToken(req *ghttp.Request, addr string) (string, error) {
+func (c *User) sendEmailCode(req *ghttp.Request, addr string) (string, error) {
 	ip, err := iptool.GetIP(req.Request)
 	if err != nil {
 		return "", errors.New("发送邮件失败！")
 	}
-	tk := rand.GetID(6)
-	if len(tk) == 0 {
+	code := rand.GetID(6)
+	if len(code) == 0 {
 		return "", errors.New("发送邮件失败！")
 	}
-	md := g.Model("tokens")
-	var tdata []entity.Tokens
+	md := g.Model("codes")
+	var tdata []entity.Codes
 	err = md.Clone().Where("target_email", addr).WithAll().Scan(&tdata)
 	if err != nil {
 		return "", errors.New("发送邮件失败！")
 	}
 	if len(tdata) == 3 {
-		_, err = md.Clone().Insert(entity.Tokens{
-			Token:       tk,
+		_, err = md.Clone().Insert(entity.Codes{
+			Code:        code,
 			CreateTime:  gtime.Now(),
 			FailureTime: gtime.Now().Add(time.Duration(60) * time.Second), // 1分钟
 			TargetEmail: addr,
@@ -463,13 +463,13 @@ func (c *User) sendEmailToken(req *ghttp.Request, addr string) (string, error) {
 		if err != nil {
 			return "", errors.New("发送邮件失败：请过1分钟后再试！")
 		}
-		return c.sendEmailToken(req, addr)
+		return c.sendEmailCode(req, addr)
 	}
 	// 发送邮件
-	c.EmailIns.Send(addr, fmt.Sprintf("您的验证码为：%s \n IP : %s \n 1分钟内有效", tk, ip))
+	c.EmailIns.Send(addr, fmt.Sprintf("您的验证码为：%s \n IP : %s \n 1分钟内有效", code, ip))
 	// 记录token
-	_, err = md.Clone().Insert(entity.Tokens{
-		Token:       tk,
+	_, err = md.Clone().Insert(entity.Codes{
+		Code:        code,
 		CreateTime:  gtime.Now(),
 		FailureTime: gtime.Now().Add(time.Duration(60) * time.Second), // 1分钟
 		TargetEmail: addr,
@@ -488,7 +488,7 @@ func (c *User) SendEmail(req *ghttp.Request) {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenEmpty, "空数据", nil)))
 	}
 	email := data["email"].(string)
-	res, err := c.sendEmailToken(req, email)
+	res, err := c.sendEmailCode(req, email)
 	if err == nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "发送成功!", g.Map{"ip": res})))
 	}
@@ -510,9 +510,9 @@ func (c *User) ValidEmail(req *ghttp.Request) {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenEmpty, "空数据", nil)))
 	}
 	user_id := data["user"].(string)
-	token := data["token"].(string)
+	code := data["code"].(string)
 	userMd := dao.User.Ctx(req.Context())
-	tokensMd := dao.Tokens.Ctx(req.Context())
+	tokensMd := dao.Codes.Ctx(req.Context())
 	var userSingle entity.User
 	err = userMd.Clone().Where("username", user_id).Scan(&userSingle)
 	if err == nil {
@@ -521,8 +521,8 @@ func (c *User) ValidEmail(req *ghttp.Request) {
 		} else {
 			// 未验证
 			email := userSingle.Email
-			var tokenRes entity.Tokens
-			err := tokensMd.Clone().Where("token", token).Where("target_email", email).Scan(&tokenRes)
+			var tokenRes entity.Codes
+			err := tokensMd.Clone().Where("token", code).Where("target_email", email).Scan(&tokenRes)
 			if err == nil {
 				// 判断有效期
 				createTime := tokenRes.CreateTime

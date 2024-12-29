@@ -11,64 +11,64 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 )
 
-// TokensDao is the data access object for table tokens.
-type TokensDao struct {
-	table   string        // table is the underlying table name of the DAO.
-	group   string        // group is the database configuration group name of current DAO.
-	columns TokensColumns // columns contains all the column names of Table for convenient usage.
+// CodesDao is the data access object for table codes.
+type CodesDao struct {
+	table   string       // table is the underlying table name of the DAO.
+	group   string       // group is the database configuration group name of current DAO.
+	columns CodesColumns // columns contains all the column names of Table for convenient usage.
 }
 
-// TokensColumns defines and stores column names for table tokens.
-type TokensColumns struct {
+// CodesColumns defines and stores column names for table codes.
+type CodesColumns struct {
 	Id          string // ID
-	Token       string // Token
+	Code        string // Token
 	CreateTime  string // 创建时间
 	FailureTime string // 失效时间
 	TargetEmail string // 目标邮箱
 	Ip          string // IP
 }
 
-// tokensColumns holds the columns for table tokens.
-var tokensColumns = TokensColumns{
+// codesColumns holds the columns for table codes.
+var codesColumns = CodesColumns{
 	Id:          "id",
-	Token:       "token",
+	Code:        "code",
 	CreateTime:  "create_time",
 	FailureTime: "failure_time",
 	TargetEmail: "target_email",
 	Ip:          "ip",
 }
 
-// NewTokensDao creates and returns a new DAO object for table data access.
-func NewTokensDao() *TokensDao {
-	return &TokensDao{
+// NewCodesDao creates and returns a new DAO object for table data access.
+func NewCodesDao() *CodesDao {
+	return &CodesDao{
 		group:   "default",
-		table:   "tokens",
-		columns: tokensColumns,
+		table:   "codes",
+		columns: codesColumns,
 	}
 }
 
 // DB retrieves and returns the underlying raw database management object of current DAO.
-func (dao *TokensDao) DB() gdb.DB {
+func (dao *CodesDao) DB() gdb.DB {
 	return g.DB(dao.group)
 }
 
 // Table returns the table name of current dao.
-func (dao *TokensDao) Table() string {
+func (dao *CodesDao) Table() string {
 	return dao.table
 }
 
 // Columns returns all column names of current dao.
-func (dao *TokensDao) Columns() TokensColumns {
+func (dao *CodesDao) Columns() CodesColumns {
 	return dao.columns
 }
 
 // Group returns the configuration group name of database of current dao.
-func (dao *TokensDao) Group() string {
+func (dao *CodesDao) Group() string {
 	return dao.group
 }
 
 // Ctx creates and returns the Model for current DAO, It automatically sets the context for current operation.
-func (dao *TokensDao) Ctx(ctx context.Context) *gdb.Model {
+func (dao *CodesDao) Ctx(ctx context.Context) *gdb.Model {
 	return dao.DB().Model(dao.table).Safe().Ctx(ctx)
 }
 
@@ -78,6 +78,6 @@ func (dao *TokensDao) Ctx(ctx context.Context) *gdb.Model {
 //
 // Note that, you should not Commit or Rollback the transaction in function f
 // as it is automatically handled by this function.
-func (dao *TokensDao) Transaction(ctx context.Context, f func(ctx context.Context, tx gdb.TX) error) (err error) {
+func (dao *CodesDao) Transaction(ctx context.Context, f func(ctx context.Context, tx gdb.TX) error) (err error) {
 	return dao.Ctx(ctx).Transaction(ctx, f)
 }

@@ -8,10 +8,10 @@ import (
 	"github.com/gogf/gf/v2/os/gtime"
 )
 
-// Tokens is the golang structure for table tokens.
-type Tokens struct {
+// Codes is the golang structure for table codes.
+type Codes struct {
 	Id          int         `json:"id"           orm:"id"           ` // ID
-	Token       string      `json:"token"        orm:"token"        ` // Token
+	Code        string      `json:"code"         orm:"code"         ` // Token
 	CreateTime  *gtime.Time `json:"create_time"  orm:"create_time"  ` // 创建时间
 	FailureTime *gtime.Time `json:"failure_time" orm:"failure_time" ` // 失效时间
 	TargetEmail string      `json:"target_email" orm:"target_email" ` // 目标邮箱
