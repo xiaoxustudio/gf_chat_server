@@ -21,4 +21,5 @@ type User struct {
 	Token        string      `json:"token"         orm:"token"         ` // 用户token
 	Group        int         `json:"group"         orm:"group"         ` // 用户分组ID
 	Avatar       string      `json:"avatar"        orm:"avatar"        ` // 用户头像
+	EmailAuth    int         `json:"email_auth"    orm:"email_auth"    ` // 邮箱验证 0 未验证 1 验证
 }

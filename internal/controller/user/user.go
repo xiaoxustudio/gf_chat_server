@@ -35,7 +35,7 @@ func (c *User) ValidToken(req *ghttp.Request) {
 	md := g.Model("user")
 	data := req.GetFormMap()
 	tok := data["token"].(string)
-	if len(tok) == 0 {
+	if data["token"] == nil || len(tok) == 0 {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenInValid, "token校验失败！", nil)))
 	}
 	vaild, err := token.ValidToken(tok)
@@ -132,10 +132,11 @@ func (c *User) GetUser(req *ghttp.Request) {
 	if err != nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "token校验失败:"+err.Error(), nil)))
 	}
-	if len(data) == 0 {
+	if len(data) == 0 || data["user"] == nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "空数据", nil)))
 	}
-	res, err := md.Where("username", data["user"]).All()
+	user_id := data["user"].(string)
+	res, err := md.Where("username", user_id).All()
 	if err == nil && res.Len() > 0 {
 		singleData := res[0].Map()
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(1, "ok", g.Map{
@@ -166,12 +167,13 @@ func (c *User) GetFriend(req *ghttp.Request) {
 	if err != nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenExpired, "token校验失败:"+err.Error(), nil)))
 	}
-	if len(data) == 0 {
+	if len(data) == 0 || data["user"] == nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenEmpty, "空数据", nil)))
 	}
+	user_id := data["user"].(string)
 	var fData []entity.Friends
 	md := dao.Friends.Ctx(req.Context())
-	err = md.Where("user_id", data["user"].(string)).FieldsEx("friend_data.password").With(entity.User{}).Scan(&fData)
+	err = md.Where("user_id", user_id).FieldsEx("friend_data.password").With(entity.User{}).Scan(&fData)
 	if err == nil {
 		var fDataEx []*entity.Friends
 		if len(fData) > 0 {
@@ -203,21 +205,22 @@ func (c *User) AddFriend(req *ghttp.Request) {
 	if err != nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenExpired, "token校验失败:"+err.Error(), nil)))
 	}
-	if len(data) == 0 {
+	if len(data) == 0 || data["user"] == nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenEmpty, "空数据", nil)))
 	}
-	res, err := md.Where("username", data["user"]).All()
+	user_id := data["user"].(string)
+	res, err := md.Where("username", user_id).All()
 	if err == nil && res.Len() > 0 {
 		jtoken, _ := token.ParseJwt(tok)
-		if data["user"] != jtoken.Username {
-			res, _ = g.Model("friends").Where("user_id", jtoken.Username).Where("friend_id", data["user"]).All()
+		if user_id != jtoken.Username {
+			res, _ = g.Model("friends").Where("user_id", jtoken.Username).Where("friend_id", user_id).All()
 			if res.Len() > 0 {
 				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "已经添加过好友了!", nil)))
 			}
 			md = dao.Friends.Ctx(req.Context())
 			_, err := md.Insert(g.Map{
 				"user_id":   jtoken.Username,
-				"friend_id": data["user"],
+				"friend_id": user_id,
 				"add_time":  time.Now(),
 			})
 			if err != nil {
@@ -246,21 +249,22 @@ func (c *User) DeleteFriend(req *ghttp.Request) {
 	if err != nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenExpired, "token校验失败:"+err.Error(), nil)))
 	}
-	if len(data) == 0 {
+	if len(data) == 0 || data["user"] == nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenEmpty, "空数据", nil)))
 	}
-	res, err := md.Where("username", data["user"]).All()
+	user_id := data["user"].(string)
+	res, err := md.Where("username", user_id).All()
 	if err == nil && res.Len() > 0 {
 		jtoken, _ := token.ParseJwt(tok)
-		if data["user"] != jtoken.Username {
-			res, _ = g.Model("friends").Where("user_id", jtoken.Username).Where("friend_id", data["user"]).All()
+		if user_id != jtoken.Username {
+			res, _ = g.Model("friends").Where("user_id", jtoken.Username).Where("friend_id", user_id).All()
 			if res.Len() == 0 {
 				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "未添加该好友!", nil)))
 			}
 			md = dao.Friends.Ctx(req.Context())
 			_, err := md.Delete(g.Map{
 				"user_id":   jtoken.Username,
-				"friend_id": data["user"],
+				"friend_id": user_id,
 			})
 			if err != nil {
 				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "删除好友失败！", nil)))
@@ -288,10 +292,11 @@ func (c *User) SearchUsers(req *ghttp.Request) {
 	if err != nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "token校验失败:"+err.Error(), nil)))
 	}
-	if len(data) == 0 {
+	if len(data) == 0 || data["nickname"] == nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "空数据", nil)))
 	}
-	res, err := md.WhereLike("nickname", fmt.Sprintf("%%%s%%", data["nickname"])).All()
+	nickname := data["nickname"].(string)
+	res, err := md.WhereLike("nickname", fmt.Sprintf("%%%s%%", nickname)).All()
 	if err == nil && res.Len() > 0 {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(1, "ok", res)))
 	} else {
@@ -443,15 +448,15 @@ func (c *User) sendEmailToken(req *ghttp.Request, addr string) (string, error) {
 		return "", errors.New("发送邮件失败：超过次数！")
 	} else if len(tdata) == 4 {
 		// 判断是否到1分钟，1分钟后可重新发送验证码
-		dur_time := time.Duration(10) * time.Second
+		dur_time := time.Duration(60) * time.Second
 		lastRow := tdata[len(tdata)-1]
 		timeInstan := time.Now().Add(dur_time)
-		p := timeInstan.Before(lastRow.CreateTime.Time)
+		p := lastRow.CreateTime.Time.Before(timeInstan)
 		if !p {
 			return "", errors.New("发送邮件失败：请过1分钟后再试！")
 		}
 		// 先清空全部，再发送
-		_, err = md.Clone().Delete(entity.Tokens{TargetEmail: addr})
+		_, err = md.Clone().Where("target_email", addr).Delete()
 		if err != nil {
 			return "", errors.New("发送邮件失败：请过1分钟后再试！")
 		}
@@ -476,7 +481,7 @@ func (c *User) sendEmailToken(req *ghttp.Request, addr string) (string, error) {
 // 向指定邮箱发送验证码链接
 func (c *User) SendEmail(req *ghttp.Request) {
 	data := req.GetFormMap()
-	if len(data) == 0 {
+	if len(data) == 0 || data["email"] == nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenEmpty, "空数据", nil)))
 	}
 	email := data["email"].(string)
@@ -485,4 +490,53 @@ func (c *User) SendEmail(req *ghttp.Request) {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "发送成功!", g.Map{"ip": res})))
 	}
 	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "发送失败："+err.Error(), nil)))
+}
+
+// 验证邮箱
+func (c *User) ValidEmail(req *ghttp.Request) {
+	data := req.GetFormMap()
+	tok := req.Header.Get("Authorization")
+	if len(tok) == 0 {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenInValid, "token校验失败！", nil)))
+	}
+	_, err := token.ValidToken(tok)
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenExpired, "token校验失败:"+err.Error(), nil)))
+	}
+	if len(data) == 0 || data["token"] == nil || data["user"] == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenEmpty, "空数据", nil)))
+	}
+	user_id := data["user"].(string)
+	token := data["token"].(string)
+	userMd := dao.User.Ctx(req.Context())
+	tokensMd := dao.Tokens.Ctx(req.Context())
+	var userSingle entity.User
+	err = userMd.Clone().Where("username", user_id).Scan(&userSingle)
+	if err == nil {
+		if email_auth := userSingle.EmailAuth; email_auth == 1 {
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "该用户已验证！", nil)))
+		} else {
+			// 未验证
+			email := userSingle.Email
+			var tokenRes entity.Tokens
+			err := tokensMd.Clone().Where("token", token).Where("target_email", email).Scan(&tokenRes)
+			if err == nil {
+				// 判断有效期
+				createTime := tokenRes.CreateTime
+				failureTime := tokenRes.FailureTime // 失效期
+				if !createTime.Before(failureTime) {
+					req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "验证码过期！", nil)))
+				}
+				// 说明验证码，邮箱，有效期都是对的
+				_, err = tokensMd.Clone().Where("target_email", email).Delete()
+				_, err1 := userMd.Clone().Where("username", user_id).Update(g.Map{"email_auth": 1})
+				if err1 == nil && err == nil {
+					req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "验证成功！", nil)))
+				}
+				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "验证失败！", nil)))
+			}
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "验证码错误！"+err.Error(), nil)))
+		}
+	}
+	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenEmpty, "未找到该用户！"+err.Error(), nil)))
 }

@@ -31,6 +31,7 @@ type UserColumns struct {
 	Token        string // 用户token
 	Group        string // 用户分组ID
 	Avatar       string // 用户头像
+	EmailAuth    string // 邮箱验证 0 未验证 1 验证
 }
 
 // userColumns holds the columns for table user.
@@ -46,6 +47,7 @@ var userColumns = UserColumns{
 	Token:        "token",
 	Group:        "group",
 	Avatar:       "avatar",
+	EmailAuth:    "email_auth",
 }
 
 // NewUserDao creates and returns a new DAO object for table data access.

@@ -23,4 +23,5 @@ type User struct {
 	Token        interface{} // 用户token
 	Group        interface{} // 用户分组ID
 	Avatar       interface{} // 用户头像
+	EmailAuth    interface{} // 邮箱验证 0 未验证 1 验证
 }
