@@ -391,11 +391,15 @@ func (r *WebSocketUnitGroup) SyncChatUserData(group_id string) {
 	if index == -1 {
 		return
 	}
-	ListToken := r.ChatListData[index]
+	ListToken := &r.ChatListData[index]
 	data := r.getChatUserData(group_id)
 	// 循环发送
 	for i, v := range ListToken.ChatList {
-		ListToken.ChatList[i].SendData = data[v.SendData.UserId].(*entity.GroupTemplate)
+		var item = &ListToken.ChatList[i]
+		// 普通消息类型
+		if item.Type == consts.Common {
+			item.SendData = data[v.SendData.UserId].(*entity.GroupTemplate)
+		}
 	}
 }
 
@@ -455,25 +459,39 @@ func (r *WebSocketUnitGroup) RemoveChat(un string, group_id string, chatIndex in
 	}
 	ListToken := &r.ChatListData[index]
 	list := ListToken.ChatList
-	if chatIndex >= 0 && chatIndex < len(list) {
-		UserName := ListToken.Users[0]
-		res, err := g.Model("user").Where("username", UserName).One()
-		if err != nil {
-			return
-		}
-		back, err := array.InsertIntoArray(list, chatIndex, ChatItem{
-			Type:    consts.System,
-			Content: fmt.Sprintf("%s(%s) 撤回了一条消息！", res.GMap().Get("nickname"), UserName),
-		})
 
-		if err == nil {
-			// 添加撤回系统消息
-			ListToken.ChatList = back
-		}
-
-		// 移除指定索引的聊天消息
-		ListToken.ChatList = array.RemoveItemFromArray(ListToken.ChatList, chatIndex+1)
-		// 同步聊天
-		r.SyncChat(group_id)
+	// 如果chatIndex无效
+	if chatIndex < 0 || chatIndex >= len(list) {
+		return
 	}
+
+	// 检查要移除的消息是否属于指定用户
+	if list[chatIndex].SendData.UserId != un {
+		return
+	}
+	res, err := g.Model("user").Where("username", un).One()
+
+	if err != nil {
+		return
+	}
+
+	// 插入撤回系统消息
+	nickname := res.GMap().Get("nickname")
+	withdrawMessage := ChatItem{
+		Type:    consts.System,
+		Content: fmt.Sprintf("%s(%s) 撤回了一条消息！", nickname, un),
+	}
+
+	back, err := array.InsertIntoArray(list, chatIndex, withdrawMessage)
+
+	if err == nil {
+		// 添加撤回系统消息
+		ListToken.ChatList = back
+	}
+
+	// 移除指定索引的聊天消息
+	ListToken.ChatList = array.RemoveItemFromArray(ListToken.ChatList, chatIndex+1)
+
+	// 同步聊天
+	r.SyncChat(group_id)
 }
