@@ -177,11 +177,11 @@ func (r *WebSocketUnitGroup) HandleWebSocketMessage(conn *websocket.Conn, msg []
 		resSelf, err := md.Clone().Where("user_id", res.UserName).One()
 		if err != nil {
 			// "失败"+err.Error()
-			res.Conn.Close()
+			conn.Close()
 			return
 		} else if len(resSelf) == 0 {
 			// "你还未加入群聊"
-			res.Conn.Close()
+			conn.Close()
 			return
 		}
 		res.GroupID = group_id
