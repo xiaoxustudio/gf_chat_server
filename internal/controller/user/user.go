@@ -136,25 +136,22 @@ func (c *User) GetUser(req *ghttp.Request) {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "空数据", nil)))
 	}
 	user_id := data["user"].(string)
-	res, err := md.Where("username", user_id).All()
-	if err == nil && res.Len() > 0 {
-		singleData := res[0].Map()
+	var singleData entity.User
+	err = md.Where("username", user_id).Scan(&singleData)
+	if err == nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(1, "ok", g.Map{
-			"nickname":      singleData["nickname"],
-			"username":      singleData["username"],
-			"phone":         singleData["phone"],
-			"email":         singleData["email"],
-			"email_auth":    singleData["email_auth"],
-			"avatar":        singleData["avatar"],
-			"register_time": singleData["register_time"],
-			"login_time":    singleData["login_time"],
-			"group":         singleData["group"],
+			"nickname":      singleData.Nickname,
+			"username":      singleData.Username,
+			"phone":         singleData.Phone,
+			"email":         singleData.Email,
+			"email_auth":    singleData.EmailAuth,
+			"avatar":        singleData.Avatar,
+			"register_time": singleData.RegisterTime,
+			"login_time":    singleData.LoginTime,
+			"group":         singleData.Group,
 		})))
 	} else {
-		if res.Len() == 0 {
-			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "未查询到该用户！", nil)))
-		}
-		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "验证失败", nil)))
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "未查询到该用户！", nil)))
 	}
 }
 
@@ -506,7 +503,7 @@ func (c *User) ValidEmail(req *ghttp.Request) {
 	if err != nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenExpired, "token校验失败:"+err.Error(), nil)))
 	}
-	if len(data) == 0 || data["token"] == nil || data["user"] == nil {
+	if len(data) == 0 || data["code"] == nil || data["user"] == nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenEmpty, "空数据", nil)))
 	}
 	user_id := data["user"].(string)
@@ -522,7 +519,7 @@ func (c *User) ValidEmail(req *ghttp.Request) {
 			// 未验证
 			email := userSingle.Email
 			var tokenRes entity.Codes
-			err := tokensMd.Clone().Where("token", code).Where("target_email", email).Scan(&tokenRes)
+			err := tokensMd.Clone().Where("code", code).Where("target_email", email).Scan(&tokenRes)
 			if err == nil {
 				// 判断有效期
 				createTime := tokenRes.CreateTime
@@ -538,7 +535,7 @@ func (c *User) ValidEmail(req *ghttp.Request) {
 				}
 				req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "验证失败！", nil)))
 			}
-			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "验证码错误！"+err.Error(), nil)))
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "验证码错误！", nil)))
 		}
 	}
 	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.TokenEmpty, "未找到该用户！"+err.Error(), nil)))
