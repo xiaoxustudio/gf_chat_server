@@ -144,6 +144,7 @@ func (c *User) GetUser(req *ghttp.Request) {
 			"username":      singleData["username"],
 			"phone":         singleData["phone"],
 			"email":         singleData["email"],
+			"email_auth":    singleData["email_auth"],
 			"avatar":        singleData["avatar"],
 			"register_time": singleData["register_time"],
 			"login_time":    singleData["login_time"],
@@ -179,8 +180,10 @@ func (c *User) GetFriend(req *ghttp.Request) {
 		if len(fData) > 0 {
 			fDataEx = make([]*entity.Friends, len(fData)-1)
 			for _, i := range fData {
-				i.FriendData.Password = ""
-				fDataEx = append(fDataEx, &i)
+				if fData != nil {
+					i.FriendData.Password = ""
+					fDataEx = append(fDataEx, &i)
+				}
 			}
 		} else {
 			fDataEx = make([]*entity.Friends, 0)
