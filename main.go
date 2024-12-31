@@ -6,6 +6,7 @@ import (
 	"gf_chat_server/internal/cmd"
 
 	_ "github.com/gogf/gf/contrib/drivers/mysql/v2"
+	"github.com/gogf/gf/frame/g"
 	"github.com/gogf/gf/v2/os/gctx"
 	"github.com/joho/godotenv"
 )
@@ -15,5 +16,6 @@ func main() {
 	if res != nil {
 		return
 	}
+	g.Cfg().SetFileName("./manifest/config/config.yaml")
 	cmd.Main.Run(gctx.GetInitCtx())
 }

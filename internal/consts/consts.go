@@ -3,6 +3,7 @@ package consts
 type ErrorCode int    // 错误码
 type WsCode int       // websocket 码
 type ChatItemType int // 聊天数据类型
+type DocType int      // 文档类型
 
 const (
 	Status ErrorCode = iota + 1
@@ -31,6 +32,9 @@ const (
 	DisConnectChannel
 	// 更新消息列表
 	UpdateMsgList
+
+	// 修改文档内容
+	ChangeContent
 )
 
 const (

@@ -1,10 +1,8 @@
 package emailsend
 
 import (
-	"context"
 	"crypto/tls"
 	"gf_chat_server/utility/envtool"
-	"gf_chat_server/utility/tw"
 
 	"gopkg.in/gomail.v2"
 )
@@ -14,7 +12,6 @@ type EmailSendIns struct {
 }
 
 func New() EmailSendIns {
-	tw.Tw(context.Background(), "徐然 %s", envtool.GetEnvValue("port", 25))
 	host := envtool.GetEnvValue("host", "smtp.qq.com").(string)
 	port := envtool.GetEnvValue("port", 25).(int)
 	userName := envtool.GetEnvValue("username", "").(string)

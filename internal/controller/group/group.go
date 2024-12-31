@@ -30,8 +30,8 @@ type GroupTemplateTable struct {
 func New() *Group {
 	return &Group{}
 }
+
 func (c *Group) validToken(req *ghttp.Request) (*token.JWTToken, error) {
-	md := g.Model("user")
 	tok := req.Header.Get("Authorization")
 	if len(tok) == 0 {
 		return &token.JWTToken{}, errors.New("token校验失败！")
@@ -39,7 +39,7 @@ func (c *Group) validToken(req *ghttp.Request) (*token.JWTToken, error) {
 	vaild, err := token.ValidToken(tok)
 	if vaild && err == nil {
 		// 进行数据库比对
-		r, err := md.Where("token", tok).All()
+		r, err := g.Model("user").Where("token", tok).All()
 		// 解析
 		if err == nil && len(r) > 0 {
 			tokVal, _ := token.ParseJwt(tok)

@@ -28,8 +28,9 @@ package cmd
 
 import (
 	"context"
+	docunit "gf_chat_server/internal/controller/docUnit"
+	"gf_chat_server/internal/controller/document"
 	"gf_chat_server/internal/controller/group"
-	"gf_chat_server/internal/controller/home"
 	"gf_chat_server/internal/controller/user"
 	websocketunit "gf_chat_server/internal/controller/websocketUnit"
 	"gf_chat_server/internal/controller/websocketUnitGroup"
@@ -54,12 +55,16 @@ var (
 			s := g.Server()
 			imc := websocketunit.New()
 			gimc := websocketUnitGroup.New()
+			doc := docunit.New()
 
 			s.BindHandler("/imc", func(r *ghttp.Request) { // 聊天websocket
 				imc.HandleWebSocket(r.Response.Writer, r.Request)
 			})
 			s.BindHandler("/gimc", func(r *ghttp.Request) { // 聊天websocket
 				gimc.HandleWebSocket(r.Response.Writer, r.Request)
+			})
+			s.BindHandler("/doc", func(r *ghttp.Request) { // 文档websocket
+				doc.HandleWebSocket(r.Response.Writer, r.Request)
 			})
 			s.Group("/user", func(group *ghttp.RouterGroup) { // 用户相关接口
 				group.Middleware(ghttp.MiddlewareHandlerResponse)
@@ -71,9 +76,9 @@ var (
 				g.Middleware(Middleware)
 				g.Bind(group.New())
 			})
-			s.Group("/home", func(group *ghttp.RouterGroup) {
+			s.Group("/doc", func(group *ghttp.RouterGroup) {
 				group.Middleware(ghttp.MiddlewareHandlerResponse)
-				group.Bind(home.New())
+				group.Bind(document.New())
 			})
 			s.SetServerRoot("/resource/public")
 			s.AddStaticPath("/temp", "./temp")
