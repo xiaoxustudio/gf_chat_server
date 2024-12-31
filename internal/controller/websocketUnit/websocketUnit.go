@@ -104,7 +104,6 @@ func (r *WebSocketUnit) HandleWebSocket(ResponseWriter http.ResponseWriter, Requ
 	if err != nil {
 		return
 	}
-	defer conn.Close()
 	var pool = r.WebSocketPool
 	// 创建新的WebSocket连接实例
 	wsConn := &WebSocketConnection{
