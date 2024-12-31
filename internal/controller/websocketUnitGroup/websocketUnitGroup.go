@@ -121,40 +121,38 @@ func (r *WebSocketUnitGroup) HandleWebSocket(ResponseWriter http.ResponseWriter,
 	pool.Lock.Unlock()
 
 	// 处理连接消息
-	go func() {
-		defer func() {
-			// 连接关闭时从连接池中移除
-			pool.Lock.Lock()
-			// 将users中剔除用户
-			var group_id = wsConn.GroupID
-			index := r.getGroupList(group_id)
-			if index == -1 {
-				return
-			}
-			ListToken := &r.ChatListData[index]
-			var NewUsers = make([]string, len(ListToken.Users))
-			for _, v := range ListToken.Users {
-				if v != wsConn.UserName {
-					NewUsers = append(NewUsers, v)
-				}
-			}
-			ListToken.Users = NewUsers
-			delete(pool.Connections, wsConn)
-			pool.Lock.Unlock()
-			conn.Close()
-		}()
-
-		for {
-			_, message, err := conn.ReadMessage()
-			if err != nil {
-				break
-			}
-
-			// 更新心跳状态
-			wsConn.LastPing = time.Now()
-			r.HandleWebSocketMessage(conn, message)
+	defer func() {
+		// 连接关闭时从连接池中移除
+		pool.Lock.Lock()
+		// 将users中剔除用户
+		var group_id = wsConn.GroupID
+		index := r.getGroupList(group_id)
+		if index == -1 {
+			return
 		}
+		ListToken := &r.ChatListData[index]
+		var NewUsers = make([]string, len(ListToken.Users))
+		for _, v := range ListToken.Users {
+			if v != wsConn.UserName {
+				NewUsers = append(NewUsers, v)
+			}
+		}
+		ListToken.Users = NewUsers
+		delete(pool.Connections, wsConn)
+		pool.Lock.Unlock()
+		conn.Close()
 	}()
+
+	for {
+		_, message, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+
+		// 更新心跳状态
+		wsConn.LastPing = time.Now()
+		r.HandleWebSocketMessage(conn, message)
+	}
 	r.sendHeartbeat()
 }
 

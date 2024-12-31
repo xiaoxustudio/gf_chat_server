@@ -119,27 +119,25 @@ func (r *WebSocketUnit) HandleWebSocket(ResponseWriter http.ResponseWriter, Requ
 	pool.Lock.Unlock()
 
 	// 处理连接消息
-	go func() {
-		defer func() {
-			// 连接关闭时从连接池中移除
-			pool.Lock.Lock()
-			delete(pool.Connections, wsConn)
-			r.RemoveChatSlot(wsConn.UserName)
-			pool.Lock.Unlock()
-			conn.Close()
-		}()
-
-		for {
-			_, message, err := conn.ReadMessage()
-			if err != nil {
-				break
-			}
-
-			// 更新心跳状态
-			wsConn.LastPing = time.Now()
-			r.HandleWebSocketMessage(conn, message)
-		}
+	defer func() {
+		// 连接关闭时从连接池中移除
+		pool.Lock.Lock()
+		delete(pool.Connections, wsConn)
+		r.RemoveChatSlot(wsConn.UserName)
+		pool.Lock.Unlock()
+		conn.Close()
 	}()
+
+	for {
+		_, message, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+
+		// 更新心跳状态
+		wsConn.LastPing = time.Now()
+		r.HandleWebSocketMessage(conn, message)
+	}
 	r.sendHeartbeat()
 }
 
