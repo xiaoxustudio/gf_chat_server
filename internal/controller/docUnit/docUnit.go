@@ -19,11 +19,11 @@ import (
 
 // 文档WebSocket连接结构体
 type WebSocketConnection struct {
-	Conn     *websocket.Conn
-	User     entity.User
-	Block    string
-	UserName string
-	Content  string
+	Conn      *websocket.Conn
+	User      entity.User
+	Block     string
+	UserName  string
+	BlockData entity.Documents
 }
 
 // 连接池
@@ -121,7 +121,6 @@ func (r *DocUnit) HandleWebSocket(ResponseWriter http.ResponseWriter, Request *h
 		User:     udata,
 		UserName: udata.Username,
 		Block:    block_id,
-		Content:  "",
 	}
 	// 将连接添加到连接池
 	pool.Lock.Lock()
@@ -135,7 +134,7 @@ func (r *DocUnit) HandleWebSocket(ResponseWriter http.ResponseWriter, Request *h
 			// 保存文档
 			pool.Lock.Lock()
 			md := g.Model("documents")
-			_, err = md.Clone().Where("user_id", wsConn.UserName).Where("block", wsConn.Block).Update(g.Map{"content": wsConn.Content})
+			_, err = md.Clone().Where("user_id", wsConn.UserName).Where("block", wsConn.Block).Update(wsConn.BlockData)
 			if err != nil {
 				tw.Tw(context.Background(), "（错误）文档未保存：%s ", err)
 			}
@@ -176,8 +175,8 @@ func (r *DocUnit) HandleWebSocketMessage(conn *websocket.Conn, msg []byte) {
 		err := md.Clone().Where("block", res.Block).Scan(&docData)
 		if err == nil {
 			// 初始化
-			res.Content = docData.Content
-			var NewData = scmsg.SCMsgO{Type: consts.HeartBeatServer, Message: res.Content}
+			res.BlockData = docData
+			var NewData = scmsg.SCMsgO{Type: consts.HeartBeatServer, Message: docData.Content, Data: docData}
 			NewDataBytes, err := json.Marshal(NewData)
 			if err != nil {
 				return
@@ -193,6 +192,9 @@ func (r *DocUnit) HandleWebSocketMessage(conn *websocket.Conn, msg []byte) {
 		}
 	} else if data.Type == consts.ChangeContent {
 		// tw.Tw(context.Background(), "修改文档内容：%s", data.Message)
-		res.Content = data.Message
+		res.BlockData.Content = data.Message
+	} else if data.Type == consts.ChangeTitle {
+		// tw.Tw(context.Background(), "修改文档标题：%s", data.Message)
+		res.BlockData.BlockName = data.Message
 	}
 }

@@ -35,6 +35,8 @@ const (
 
 	// 修改文档内容
 	ChangeContent
+	// 修改文档标题
+	ChangeTitle
 )
 
 const (
