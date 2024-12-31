@@ -1,6 +1,7 @@
 package document
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"gf_chat_server/internal/consts"
@@ -57,9 +58,13 @@ func (d *Document) CreatePage(req *ghttp.Request) {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "创建页面失败：缺少参数", nil)))
 	}
 
-	typeVal, ok := strconv.Atoi(data["type"].(string))
-	if ok != nil {
-		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "创建页面失败：类型参数类型错误", nil)))
+	typeVal, ok := data["type"].(int)
+	if !ok {
+		toInt, ok := strconv.Atoi(string(data["type"].(json.Number)))
+		if ok != nil {
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "创建页面失败：类型参数类型错误", nil)))
+		}
+		typeVal = toInt
 	}
 
 	if !(typeVal == 0 || typeVal == 1 || typeVal == 2) {
@@ -84,11 +89,13 @@ func (d *Document) CreatePage(req *ghttp.Request) {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "创建页面错误（初始化重复页面ID）", nil)))
 	}
 	_, err = md.Clone().Insert(entity.Documents{
-		Block:   document_id,
-		UserId:  tk.Username,
-		Type:    typeVal,
-		Status:  1,
-		Content: "",
+		Block:     document_id,
+		UserId:    tk.Username,
+		Type:      typeVal,
+		Status:    1,
+		Content:   "",
+		BlockDesc: "",
+		BlockName: "无标题",
 	})
 	if err == nil {
 		createTableSQL := `
