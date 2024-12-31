@@ -20,22 +20,26 @@ type DocumentsDao struct {
 
 // DocumentsColumns defines and stores column names for table documents.
 type DocumentsColumns struct {
-	Id      string // ID
-	Block   string // blockID
-	UserId  string // 属于用户
-	Type    string // 类型 0 文件夹 1 页面
-	Content string // 页面内容
-	Status  string // block状态 0 锁定 1 可编辑
+	Id        string // ID
+	Block     string // blockID
+	BlockDesc string // 页面简介
+	BlockName string // 页面名称
+	UserId    string // 属于用户
+	Type      string // 类型 0 文件夹 1 页面
+	Content   string // 页面内容
+	Status    string // block状态 0 锁定 1 可编辑
 }
 
 // documentsColumns holds the columns for table documents.
 var documentsColumns = DocumentsColumns{
-	Id:      "id",
-	Block:   "block",
-	UserId:  "user_id",
-	Type:    "type",
-	Content: "content",
-	Status:  "status",
+	Id:        "id",
+	Block:     "block",
+	BlockDesc: "block_desc",
+	BlockName: "block_name",
+	UserId:    "user_id",
+	Type:      "type",
+	Content:   "content",
+	Status:    "status",
 }
 
 // NewDocumentsDao creates and returns a new DAO object for table data access.
