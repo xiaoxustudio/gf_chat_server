@@ -196,5 +196,11 @@ func (r *DocUnit) HandleWebSocketMessage(conn *websocket.Conn, msg []byte) {
 	} else if data.Type == consts.ChangeTitle {
 		// tw.Tw(context.Background(), "修改文档标题：%s", data.Message)
 		res.BlockData.BlockName = data.Message
+		md := g.Model("documents")
+		ws := r.GetWsForConn(conn)
+		_, err = md.Clone().Where("user_id", ws.UserName).Where("block", ws.Block).Update(ws.BlockData)
+		if err != nil {
+			tw.Tw(context.Background(), "（错误）文档未保存：%s ", err)
+		}
 	}
 }

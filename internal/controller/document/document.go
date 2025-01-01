@@ -135,11 +135,12 @@ func (d *Document) GetPages(req *ghttp.Request) {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, fmt.Sprintf("获取页面失败：%s", err.Error()), nil)))
 	}
 	md := dao.Documents.Ctx(req.Context())
-	res, err := md.Clone().Where(g.Map{"user_id": tk.Username}).All()
+	var Ddata []entity.Documents
+	err = md.Clone().Where(g.Map{"user_id": tk.Username}).WithAll().Scan(&Ddata)
 	if err == nil {
-		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", res)))
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", Ddata)))
 	}
-	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取页面失败", res)))
+	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取页面失败", nil)))
 }
 
 // 获取指定用户指定的page信息
@@ -147,7 +148,7 @@ func (d *Document) GetPage(req *ghttp.Request) {
 	tk, err := d.validToken(req)
 	data := req.GetFormMap()
 	if err != nil {
-		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, fmt.Sprintf("获取页面失败：%s", err.Error()), nil)))
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, fmt.Sprintf("创建页面失败：%s", err.Error()), nil)))
 	}
 	if data == nil || data["block"] == nil {
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "创建页面失败：缺少参数", nil)))
@@ -157,9 +158,34 @@ func (d *Document) GetPage(req *ghttp.Request) {
 	res, err := md.Clone().Where(g.Map{"user_id": tk.Username, "block": block_id}).One()
 	if err == nil {
 		if res.IsEmpty() {
-			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取页面失败：未找到页面", res)))
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "创建页面失败：未找到页面", nil)))
 		}
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", res)))
 	}
-	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取页面失败", res)))
+	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "创建页面失败", nil)))
+}
+
+func (d *Document) DeletePage(req *ghttp.Request) {
+	tk, err := d.validToken(req)
+	data := req.GetFormMap()
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, fmt.Sprintf("删除页面失败：%s", err.Error()), nil)))
+	}
+	if data == nil || data["block"] == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "删除页面失败：缺少参数", nil)))
+	}
+	block_id := data["block"].(string)
+	md := dao.Documents.Ctx(req.Context())
+	res, err := md.Clone().Where(g.Map{"user_id": tk.Username, "block": block_id}).One()
+	if err == nil {
+		if res.IsEmpty() {
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "删除页面失败：未找到页面", nil)))
+		}
+		res, err := md.Clone().Where(g.Map{"user_id": tk.Username, "block": block_id}).Delete()
+		if err != nil {
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "删除页面失败：异常", nil)))
+		}
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", res)))
+	}
+	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "删除页面失败", nil)))
 }

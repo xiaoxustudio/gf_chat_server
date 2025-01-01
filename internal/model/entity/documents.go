@@ -4,6 +4,7 @@
 
 package entity
 
+
 // Documents is the golang structure for table documents.
 type Documents struct {
 	Id        int    `json:"id"         orm:"id"         ` // ID
