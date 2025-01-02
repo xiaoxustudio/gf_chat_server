@@ -101,23 +101,26 @@ func (c *User) Login(req *ghttp.Request) {
 	}
 	username := data["username"].(string)
 	password := data["password"].(string)
-	usernameRes, err := md.Where("username", username).Where("password", password).All()
-	if err == nil && usernameRes.Len() > 0 {
+	var singleData entity.User
+	err := md.Where("username", username).Where("password", password).WithAll().Scan(&singleData)
+	if err == nil {
 		// 分发token
 		token, _ := token.Token(data["username"].(string), 24)
 		md.Update(g.Map{"token": token})
-		singleData := usernameRes[0].Map()
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "登录成功！", g.Map{
-			"username": singleData["username"],
-			"nickname": singleData["nickname"],
-			"token":    token,
+			"nickname":      singleData.Nickname,
+			"username":      singleData.Username,
+			"phone":         singleData.Phone,
+			"email":         singleData.Email,
+			"email_auth":    singleData.EmailAuth,
+			"avatar":        singleData.Avatar,
+			"register_time": singleData.RegisterTime,
+			"login_time":    singleData.LoginTime,
+			"group":         singleData.Group,
+			"token":         token,
 		})))
 	} else {
-		if err != nil {
-			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "登录失败！数据异常", nil)))
-		} else {
-			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "登录失败！账户或密码错误", nil)))
-		}
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "登录失败！账户或密码错误", nil)))
 	}
 }
 
