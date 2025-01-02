@@ -136,12 +136,26 @@ func (d *Document) GetPages(req *ghttp.Request) {
 	}
 	md := dao.Documents.Ctx(req.Context())
 	var Ddata []entity.Documents
-	err = md.Clone().Where(g.Map{"user_id": tk.Username}).WithAll().Scan(&Ddata)
+	err = md.Clone().WithAll().Scan(&Ddata)
 	if err == nil {
 		if len(Ddata) == 0 {
 			Ddata = make([]entity.Documents, 0)
 		}
-		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", Ddata)))
+		var DData = make([]entity.Documents, 0)
+		for _, v := range Ddata {
+			res, err := g.Model(fmt.Sprintf("document-%s", v.Block)).Where("user_id", tk.Username).All()
+			v.DocData = res
+			if v.UserId == tk.Username {
+				// 如果是自己创建的
+				DData = append(DData, v)
+			} else {
+				// 判断是否是分享给我们的
+				if err == nil && len(res) > 0 {
+					DData = append(DData, v)
+				}
+			}
+		}
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", DData)))
 	}
 	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取页面失败", nil)))
 }

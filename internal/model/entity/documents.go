@@ -15,4 +15,5 @@ type Documents struct {
 	Type      int    `json:"type"       orm:"type"       ` // 类型 0 文件夹 1 页面
 	Content   string `json:"content"    orm:"content"    ` // 页面内容
 	Status    int    `json:"status"     orm:"status"     ` // block状态 0 锁定 1 可编辑
+	DocData any `json:"doc_data"         ` 
 }

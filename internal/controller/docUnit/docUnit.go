@@ -30,8 +30,9 @@ type WebSocketConnection struct {
 
 // 连接池
 type WebSocketPool struct {
-	Connections map[*websocket.Conn]*WebSocketConnection
-	Lock        sync.Mutex
+	Connections  map[*websocket.Conn]*WebSocketConnection
+	RConnections map[string]*WebSocketConnection // 修改的block ，所有连接用户共同维护同一个block
+	Lock         sync.Mutex
 }
 
 var upgrader = websocket.Upgrader{
@@ -51,7 +52,8 @@ type DocUnit struct {
 
 func New() DocUnit {
 	pool := &WebSocketPool{
-		Connections: make(map[*websocket.Conn]*WebSocketConnection),
+		Connections:  make(map[*websocket.Conn]*WebSocketConnection),
+		RConnections: make(map[string]*WebSocketConnection),
 	}
 	return DocUnit{WebSocketPool: pool}
 }
@@ -76,26 +78,9 @@ func (r *DocUnit) ValidToken(username string, Request *http.Request) bool {
 	}
 }
 
-// 使用Conn获取Ws连接
-func (r *DocUnit) GetWsForConn(conn *websocket.Conn) *WebSocketConnection {
-	var pool = r.WebSocketPool
-	for i, wsConn := range pool.Connections {
-		if conn == i {
-			return wsConn
-		}
-	}
-	return nil
-}
-
-// 使用Username获取Ws连接
-func (r *DocUnit) GetWsForUsername(un string) *WebSocketConnection {
-	var pool = r.WebSocketPool
-	for _, wsConn := range pool.Connections {
-		if wsConn.UserName == un {
-			return wsConn
-		}
-	}
-	return nil
+// 使用block获取block实例
+func (r *DocUnit) GetWsForConn(block string) *WebSocketConnection {
+	return r.WebSocketPool.RConnections[block]
 }
 
 func (r *DocUnit) HandleWebSocket(ResponseWriter http.ResponseWriter, Request *http.Request) {
@@ -126,7 +111,20 @@ func (r *DocUnit) HandleWebSocket(ResponseWriter http.ResponseWriter, Request *h
 	}
 	// 将连接添加到连接池
 	pool.Lock.Lock()
-	pool.Connections[conn] = wsConn
+	// 在连接池中找
+
+	if _, ok := pool.RConnections[block_id]; !ok {
+		// 更新文档内容
+		md := dao.Documents.Ctx(context.Background())
+		var docData entity.Documents
+		err := md.Clone().Where("block", block_id).Scan(&docData)
+		if err != nil {
+			conn.Close()
+		}
+		wsConn.BlockData = docData
+		pool.RConnections[block_id] = wsConn
+	}
+	pool.Connections[conn] = pool.RConnections[block_id]
 	pool.Lock.Unlock()
 
 	go func() {
@@ -136,18 +134,18 @@ func (r *DocUnit) HandleWebSocket(ResponseWriter http.ResponseWriter, Request *h
 			// 保存文档
 			pool.Lock.Lock()
 			md := g.Model("documents")
-			_, err = md.Clone().Where("user_id", wsConn.UserName).Where("block", wsConn.Block).Update(wsConn.BlockData)
+			_, err = md.Clone().Where("block", block_id).Update(pool.RConnections[block_id].BlockData)
 			if err != nil {
 				tw.Tw(context.Background(), "（错误）文档未保存：%s ", err)
 			}
 
-			r.UpdateAndSyncPeople(wsConn.Conn, wsConn.Block)
+			r.UpdateAndSyncPeople(wsConn.Conn, block_id)
 			// 从连接池中移除
 			tw.Tw(context.Background(), "文档通信退出：%s", wsConn.UserName)
 			// 更新协作
 			delete(pool.Connections, wsConn.Conn)
-			pool.Lock.Unlock()
 			conn.Close()
+			pool.Lock.Unlock()
 		}()
 
 		for {
@@ -164,7 +162,7 @@ func (r *DocUnit) HandleWebSocket(ResponseWriter http.ResponseWriter, Request *h
 
 // 更新数组并发送
 func (r *DocUnit) UpdateAndSyncPeople(conn *websocket.Conn, document_id string) {
-	res := r.GetWsForConn(conn)
+	res := r.GetWsForConn(document_id)
 	tableName := fmt.Sprintf("`document-%s`", document_id)
 	md := g.Model(tableName)
 	var pdata []entity.DocumentTemplate
@@ -191,34 +189,30 @@ func (r *DocUnit) HandleWebSocketMessage(conn *websocket.Conn, msg []byte) {
 	var pool = r.WebSocketPool
 	var data scmsg.SCMsgO
 	err := json.Unmarshal(msg, &data)
-	res := r.GetWsForConn(conn)
+	res := pool.Connections[conn]
 	if err != nil || res == nil {
 		conn.Close()
 		return
 	} else if data.Type == consts.CreateChannel {
 		tw.Tw(context.Background(), "创建通道：%s", data.Message)
-		// 验证
-		pool.Lock.Lock()
-		md := dao.Documents.Ctx(context.Background())
-		var docData entity.Documents
-		err := md.Clone().Where("block", res.Block).Scan(&docData)
-		if err == nil {
-			// 初始化
-			res.BlockData = docData
-			r.UpdateAndSyncPeople(conn, docData.Block)
-			pool.Lock.Unlock()
-		} else {
-			conn.Close()
-		}
+		r.UpdateAndSyncPeople(conn, res.Block)
 	} else if data.Type == consts.ChangeContent {
 		// tw.Tw(context.Background(), "修改文档内容：%s", data.Message)
-		res.BlockData.Content = data.Message
+		pool.Lock.Lock()
+		// 判断是否有权限更改
+		for _, v := range res.People {
+			if v.Auth > 0 && v.UserId == res.UserName {
+				res.BlockData.Content = data.Message
+				break
+			}
+		}
+		pool.Lock.Unlock()
 	} else if data.Type == consts.ChangeTitle {
 		// tw.Tw(context.Background(), "修改文档标题：%s", data.Message)
 		res.BlockData.BlockName = data.Message
 		md := g.Model("documents")
-		ws := r.GetWsForConn(conn)
-		_, err = md.Clone().Where("user_id", ws.UserName).Where("block", ws.Block).Update(ws.BlockData)
+		_, err = md.Clone().Where("user_id", res.UserName).Where("block", res.Block).Update(res.BlockData)
+		tw.Tw(context.Background(), "（123）文档：%s ", res.Block)
 		if err != nil {
 			tw.Tw(context.Background(), "（错误）文档未保存：%s ", err)
 		}
