@@ -14,4 +14,5 @@ type DocumentTemplate struct {
 	UserId  string      `json:"user_id"  orm:"user_id"  ` // 用户名
 	Auth    int         `json:"auth"     orm:"auth"     ` // 用户权限：0 可查看 1可编辑 2可管理
 	AddTime *gtime.Time `json:"add_time" orm:"add_time" ` // 添加时间
+	UserData *User  `json:"user_data" orm:"with:username=user_id" `
 }

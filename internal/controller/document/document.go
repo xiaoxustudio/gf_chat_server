@@ -138,6 +138,9 @@ func (d *Document) GetPages(req *ghttp.Request) {
 	var Ddata []entity.Documents
 	err = md.Clone().Where(g.Map{"user_id": tk.Username}).WithAll().Scan(&Ddata)
 	if err == nil {
+		if len(Ddata) == 0 {
+			Ddata = make([]entity.Documents, 0)
+		}
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", Ddata)))
 	}
 	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取页面失败", nil)))
@@ -181,11 +184,88 @@ func (d *Document) DeletePage(req *ghttp.Request) {
 		if res.IsEmpty() {
 			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "删除页面失败：未找到页面", nil)))
 		}
-		res, err := md.Clone().Where(g.Map{"user_id": tk.Username, "block": block_id}).Delete()
+		_, err = md.Clone().Where(g.Map{"user_id": tk.Username, "block": block_id}).Delete()
 		if err != nil {
-			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "删除页面失败：异常", nil)))
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "删除页面失败：异常"+err.Error(), nil)))
 		}
+		sqlStr := fmt.Sprintf("DROP TABLE IF EXISTS `document-%s`;", block_id)
+		_, err1 := g.DB().Exec(sqlStr)
+
+		if err1 != nil {
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "删除页面失败：异常"+err1.Error(), nil)))
+		}
+
 		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", res)))
 	}
 	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "删除页面失败", nil)))
+}
+
+// 获取页面全部协作者
+func (d *Document) GetPageCollaborators(req *ghttp.Request) {
+	_, err := d.validToken(req)
+	data := req.GetFormMap()
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, fmt.Sprintf("获取协作者失败：%s", err.Error()), nil)))
+	}
+	if data == nil || data["block"] == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取协作者失败：缺少参数", nil)))
+	}
+	block_id := data["block"].(string)
+	tableName := fmt.Sprintf("document-%s", block_id)
+	md := g.Model(tableName)
+	res, err := md.Clone().All()
+	if err == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", res)))
+	}
+	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "获取协作者失败："+err.Error(), nil)))
+}
+
+// 邀请协作
+func (d *Document) InvitePeople(req *ghttp.Request) {
+	tk, err := d.validToken(req)
+	data := req.GetFormMap()
+	if err != nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, fmt.Sprintf("邀请失败：%s", err.Error()), nil)))
+	}
+	if data == nil || data["block"] == nil || data["users"] == nil {
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "邀请页面失败：缺少参数", nil)))
+	}
+	block_id := data["block"].(string)
+	var members = make([]string, 0)
+	for _, v := range data["users"].([]interface{}) {
+		members = append(members, v.(string))
+	}
+	md := dao.Documents.Ctx(req.Context())
+	var bdata entity.Documents
+	err = md.Clone().Where(g.Map{"user_id": tk.Username, "block": block_id}).Scan(&bdata)
+	if err == nil {
+		tableName := fmt.Sprintf("document-%s", block_id)
+		md := g.Model(tableName)
+		_, err = md.Clone().Where("auth", 2).Where("user_id", tk.Username).One()
+		if err == nil {
+			for _, v := range members {
+				_, err := g.Model("user").Where("username", v).One()
+				if err != nil {
+					// 用户不存在则跳过
+					continue
+				}
+				_, err = md.Clone().Where("user_id", v).One()
+				if err != nil {
+					// 用户已存在在页面中则跳过
+					continue
+				}
+				_, err = md.Clone().Insert(g.Map{
+					"user_id":  v,
+					"add_time": gtime.Now(),
+					"auth":     1,
+				})
+				if err != nil {
+					req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "邀请失败："+err.Error(), nil)))
+				}
+			}
+			req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(consts.Success, "ok", nil)))
+		}
+		req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "邀请失败：无管理权限", nil)))
+	}
+	req.Response.WriteJsonExit(msgtoken.ToGMap(msgtoken.MsgToken(0, "邀请失败"+err.Error(), nil)))
 }

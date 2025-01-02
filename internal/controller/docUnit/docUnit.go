@@ -3,6 +3,7 @@ package docunit
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"gf_chat_server/internal/consts"
 	"gf_chat_server/internal/dao"
 	"gf_chat_server/internal/model/entity"
@@ -24,6 +25,7 @@ type WebSocketConnection struct {
 	Block     string
 	UserName  string
 	BlockData entity.Documents
+	People    []entity.DocumentTemplate
 }
 
 // 连接池
@@ -138,8 +140,11 @@ func (r *DocUnit) HandleWebSocket(ResponseWriter http.ResponseWriter, Request *h
 			if err != nil {
 				tw.Tw(context.Background(), "（错误）文档未保存：%s ", err)
 			}
+
+			r.UpdateAndSyncPeople(wsConn.Conn, wsConn.Block)
 			// 从连接池中移除
 			tw.Tw(context.Background(), "文档通信退出：%s", wsConn.UserName)
+			// 更新协作
 			delete(pool.Connections, wsConn.Conn)
 			pool.Lock.Unlock()
 			conn.Close()
@@ -155,6 +160,30 @@ func (r *DocUnit) HandleWebSocket(ResponseWriter http.ResponseWriter, Request *h
 		}
 	}()
 	// r.sendHeartbeat()
+}
+
+// 更新数组并发送
+func (r *DocUnit) UpdateAndSyncPeople(conn *websocket.Conn, document_id string) {
+	res := r.GetWsForConn(conn)
+	tableName := fmt.Sprintf("`document-%s`", document_id)
+	md := g.Model(tableName)
+	var pdata []entity.DocumentTemplate
+	err := md.Clone().WithAll().Scan(&pdata)
+	if err == nil {
+		res.People = pdata
+		var NewData = scmsg.SCMsgO{Type: consts.HeartBeatServer,
+			Message: "",
+			Data: g.Map{"doc_data": res.BlockData,
+				"people_data": pdata}}
+		NewDataBytes, err := json.Marshal(NewData)
+		if err != nil {
+			return
+		}
+		err = conn.WriteMessage(websocket.TextMessage, NewDataBytes)
+		if err != nil {
+			conn.Close()
+		}
+	}
 }
 
 // 处理message
@@ -176,19 +205,10 @@ func (r *DocUnit) HandleWebSocketMessage(conn *websocket.Conn, msg []byte) {
 		if err == nil {
 			// 初始化
 			res.BlockData = docData
-			var NewData = scmsg.SCMsgO{Type: consts.HeartBeatServer, Message: docData.Content, Data: docData}
-			NewDataBytes, err := json.Marshal(NewData)
-			if err != nil {
-				return
-			}
-			err = conn.WriteMessage(websocket.TextMessage, NewDataBytes)
-			if err != nil {
-				conn.Close()
-			}
+			r.UpdateAndSyncPeople(conn, docData.Block)
 			pool.Lock.Unlock()
 		} else {
 			conn.Close()
-			return
 		}
 	} else if data.Type == consts.ChangeContent {
 		// tw.Tw(context.Background(), "修改文档内容：%s", data.Message)
